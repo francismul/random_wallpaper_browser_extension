@@ -37,23 +37,6 @@ pnpm install
 pnpm run build
 ```
 
-or use build scripts (Windows)
-
-```powershell
-# command prompt / powershell
-setup.bat
-
-# or
-setup.ps1
-```
-
-(Linux/Mac users can use)
-
-```bash
-chmod +x setup.sh
-./setup.sh
-```
-
 ### 2. Load in Browser
 
 #### Chrome/Edge
