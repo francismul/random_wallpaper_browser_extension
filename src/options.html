@@ -1,826 +1,1099 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Random Wallpaper Settings</title>
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-      margin: 0;
-      padding: 0;
-      color: #333;
-      height: 100vh;
-      overflow: hidden;
-    }
-
-    .container {
-      height: 100vh;
-      max-width: 900px;
-      margin: 0 auto;
-      background: white;
-      box-shadow: 0 0 30px rgba(0, 0, 0, 0.15);
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-    }
-
-    header {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      padding: 25px 30px;
-      flex-shrink: 0;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-      z-index: 10;
-    }
-
-    .header-content {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 15px;
-    }
-
-    .title-section {
-      flex: 1;
-    }
-
-    .header-actions {
-      display: flex;
-      align-items: center;
-      gap: 15px;
-    }
-
-    .loading-indicator {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      color: rgba(255, 255, 255, 0.9);
-      font-size: 14px;
-    }
-
-    .spinner {
-      width: 16px;
-      height: 16px;
-      border: 2px solid rgba(255, 255, 255, 0.3);
-      border-top: 2px solid rgba(255, 255, 255, 0.9);
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-    }
-
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-
-    h1 {
-      font-size: 28px;
-      margin-bottom: 8px;
-    }
-
-    .subtitle {
-      opacity: 0.9;
-      font-size: 14px;
-    }
-
-    .content {
-      flex: 1;
-      overflow-y: auto;
-      overflow-x: hidden;
-      padding: 30px;
-      scroll-behavior: smooth;
-    }
-
-    /* Custom scrollbar styling */
-    .content::-webkit-scrollbar {
-      width: 8px;
-    }
-
-    .content::-webkit-scrollbar-track {
-      background: #f1f1f1;
-      border-radius: 4px;
-    }
-
-    .content::-webkit-scrollbar-thumb {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      border-radius: 4px;
-    }
-
-    .content::-webkit-scrollbar-thumb:hover {
-      background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
-    }
-
-    .section {
-      margin-bottom: 40px;
-      opacity: 0;
-      animation: fadeInUp 0.6s ease forwards;
-    }
-
-    .section:nth-child(1) { animation-delay: 0.1s; }
-    .section:nth-child(2) { animation-delay: 0.2s; }
-    .section:nth-child(3) { animation-delay: 0.3s; }
-    .section:nth-child(4) { animation-delay: 0.4s; }
-    .section:nth-child(5) { animation-delay: 0.5s; }
-
-    .section:last-child {
-      margin-bottom: 0;
-    }
-
-    @keyframes fadeInUp {
-      from {
-        opacity: 0;
-        transform: translateY(20px);
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Random Wallpaper Settings</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
       }
-      to {
-        opacity: 1;
-        transform: translateY(0);
+
+      html {
+        color-scheme: dark;
       }
-    }
 
-    /* Smooth transitions for interactive elements */
-    button, input, select, .stat-card {
-      transition: all 0.2s ease;
-    }
-
-    .message {
-      animation: slideDown 0.3s ease forwards;
-    }
-
-    @keyframes slideDown {
-      from {
-        opacity: 0;
-        transform: translateY(-10px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-
-    .section-title {
-      font-size: 20px;
-      font-weight: 600;
-      margin-bottom: 20px;
-      color: #667eea;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .section-title svg {
-      width: 24px;
-      height: 24px;
-    }
-
-    .form-group {
-      margin-bottom: 20px;
-    }
-
-    label {
-      display: block;
-      font-weight: 500;
-      margin-bottom: 8px;
-      color: #555;
-    }
-
-    input[type="text"],
-    input[type="password"],
-    input[type="number"],
-    textarea {
-      width: 100%;
-      padding: 12px;
-      border: 2px solid #e0e0e0;
-      border-radius: 8px;
-      font-size: 14px;
-      font-family: inherit;
-      transition: border-color 0.3s;
-    }
-
-    input[type="text"]:focus,
-    input[type="password"]:focus,
-    input[type="number"]:focus,
-    textarea:focus {
-      outline: none;
-      border-color: #667eea;
-    }
-
-    textarea {
-      resize: vertical;
-      min-height: 80px;
-    }
-
-    .input-group {
-      display: flex;
-      gap: 10px;
-      align-items: flex-end;
-    }
-
-    .input-group > div {
-      flex: 1;
-    }
-
-    button {
-      background: #667eea;
-      color: white;
-      border: none;
-      padding: 12px 24px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: 14px;
-      font-weight: 500;
-      transition: all 0.3s;
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    button:hover {
-      background: #5568d3;
-      transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
-    }
-
-    button:active {
-      transform: translateY(0);
-    }
-
-    button.secondary {
-      background: #6c757d;
-    }
-
-    button.secondary:hover {
-      background: #5a6268;
-    }
-
-    button.danger {
-      background: #dc3545;
-    }
-
-    button.danger:hover {
-      background: #c82333;
-    }
-
-    button.success {
-      background: #28a745;
-    }
-
-    button.success:hover {
-      background: #218838;
-    }
-
-    button:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-      transform: none;
-    }
-
-    .api-key-item {
-      display: flex;
-      gap: 10px;
-      align-items: center;
-      padding: 12px;
-      background: #f8f9fa;
-      border-radius: 8px;
-      margin-bottom: 10px;
-    }
-
-    .api-key-item .source {
-      font-weight: 600;
-      min-width: 100px;
-      color: #667eea;
-    }
-
-    .api-key-item .key {
-      flex: 1;
-      font-family: monospace;
-      font-size: 13px;
-      color: #666;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .api-key-item .status {
-      padding: 4px 12px;
-      border-radius: 12px;
-      font-size: 12px;
-      font-weight: 500;
-    }
-
-    .api-key-item .status.valid {
-      background: #d4edda;
-      color: #155724;
-    }
-
-    .api-key-item .status.invalid {
-      background: #f8d7da;
-      color: #721c24;
-    }
-
-    .api-key-item .status.unknown {
-      background: #d1ecf1;
-      color: #0c5460;
-    }
-
-    .checkbox-group {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin-bottom: 15px;
-    }
-
-    input[type="checkbox"] {
-      width: 20px;
-      height: 20px;
-      cursor: pointer;
-    }
-
-    .checkbox-container {
-      display: flex;
-      align-items: flex-start;
-      gap: 12px;
-      margin-bottom: 15px;
-      cursor: pointer;
-    }
-
-    .checkbox-container input[type="checkbox"] {
-      margin-top: 2px;
-      flex-shrink: 0;
-    }
-
-    .checkbox-label {
-      flex: 1;
-    }
-
-    .checkbox-label strong {
-      display: block;
-      margin-bottom: 4px;
-      color: #333;
-    }
-
-    .setting-description {
-      font-size: 13px;
-      color: #666;
-      line-height: 1.4;
-    }
-
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-      gap: 15px;
-    }
-
-    .stat-card {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      padding: 20px;
-      border-radius: 8px;
-      text-align: center;
-    }
-
-    .stat-card .value {
-      font-size: 32px;
-      font-weight: 700;
-      margin-bottom: 5px;
-    }
-
-    .stat-card .label {
-      font-size: 13px;
-      opacity: 0.9;
-    }
-
-    .stat-card.secondary {
-      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-    }
-
-    .stat-card.tertiary {
-      background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-    }
-
-    .message {
-      padding: 8px 16px;
-      border-radius: 6px;
-      font-size: 14px;
-      font-weight: 500;
-      display: none;
-      align-items: center;
-      gap: 8px;
-      margin-top: 10px;
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      backdrop-filter: blur(10px);
-    }
-
-    .message.show {
-      display: flex;
-    }
-
-    .message.success {
-      background: rgba(212, 237, 218, 0.95);
-      color: #155724;
-      border-color: rgba(195, 230, 203, 0.8);
-    }
-
-    .message.error {
-      background: rgba(248, 215, 218, 0.95);
-      color: #721c24;
-      border-color: rgba(245, 198, 203, 0.8);
-    }
-
-    .message.info {
-      background: rgba(209, 236, 241, 0.95);
-      color: #0c5460;
-      border-color: rgba(190, 229, 235, 0.8);
-    }
-
-    .help-text {
-      font-size: 13px;
-      color: #6c757d;
-      margin-top: 5px;
-    }
-
-    .button-group {
-      display: flex;
-      gap: 10px;
-      margin-top: 20px;
-    }
-
-    .slider-group {
-      display: flex;
-      align-items: center;
-      gap: 15px;
-    }
-
-    input[type="range"] {
-      flex: 1;
-      height: 6px;
-      border-radius: 3px;
-      background: #e0e0e0;
-      outline: none;
-    }
-
-    input[type="range"]::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      appearance: none;
-      width: 20px;
-      height: 20px;
-      border-radius: 50%;
-      background: #667eea;
-      cursor: pointer;
-    }
-
-    input[type="range"]::-moz-range-thumb {
-      width: 20px;
-      height: 20px;
-      border-radius: 50%;
-      background: #667eea;
-      cursor: pointer;
-      border: none;
-    }
-
-    .interval-display {
-      min-width: 80px;
-      text-align: center;
-      font-weight: 600;
-      color: #667eea;
-    }
-
-    /* Responsive Design */
-    @media (max-width: 768px) {
-      .container {
-        max-width: 100%;
+      body {
+        font-family: "Courier New", Courier, monospace;
+        margin: 0;
+        padding: 0;
         height: 100vh;
+        overflow: hidden;
       }
 
-      header {
-        padding: 20px;
-      }
-
-      h1 {
-        font-size: 24px;
-      }
-
-      .content {
-        padding: 20px;
-      }
-
-      .stats-grid {
-        grid-template-columns: 1fr;
-      }
-
-      .button-group {
+      .container {
+        height: 100vh;
+        max-width: 1200px;
+        margin: 0 auto;
+        box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
+        display: flex;
         flex-direction: column;
+        overflow: hidden;
       }
 
-      .button-group button {
-        width: 100%;
-      }
-    }
-
-    @media (max-width: 480px) {
       header {
-        padding: 15px;
+        background: #2d2d2d;
+        color: #00ff9d;
+        padding: 5px 10px;
+        flex-shrink: 0;
+        box-shadow: 0 4px 0 rgba(0, 0, 0, 0.5);
+        z-index: 10;
+        border-bottom: 2px solid #333;
+      }
+
+      .header-content {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+      }
+
+      .title-section {
+        flex: 1;
+      }
+
+      .header-actions {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+      }
+
+      .loading-indicator {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: rgba(255, 255, 255, 0.9);
+        font-size: 14px;
+      }
+
+      .spinner {
+        width: 16px;
+        height: 16px;
+        border: 2px solid rgba(0, 255, 157, 0.3);
+        border-top: 2px solid rgba(0, 255, 157, 0.9);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
       }
 
       h1 {
-        font-size: 20px;
+        font-size: 28px;
+        margin-bottom: 8px;
+      }
+
+      .subtitle {
+        opacity: 0.9;
+        font-size: 14px;
       }
 
       .content {
-        padding: 15px;
+        flex: 1;
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding: 20px;
+        scroll-behavior: smooth;
+
+        /* Bento Grid Layout */
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(1fr, 1fr));
+        gap: 30px; /* Increased gap */
+        align-content: start;
+      }
+
+      /* Custom scrollbar styling */
+      .content::-webkit-scrollbar {
+        width: 12px;
+      }
+
+      .content::-webkit-scrollbar-track {
+        background: #121212;
+      }
+
+      .content::-webkit-scrollbar-thumb {
+        background: #444;
+        border: 2px solid #121212;
+        border-radius: 0;
+      }
+
+      .content::-webkit-scrollbar-thumb:hover {
+        background: #00ff9d;
+      }
+
+      .section {
+        margin-bottom: 0;
+        opacity: 0;
+        animation: fadeInUp 0.6s ease forwards;
+
+        /* Bento Card Styling */
+        background: #2d2d2d;
+        border: 2px solid #444;
+        border-radius: 12px;
+        padding: 30px; /* Increased padding */
+        box-shadow: 6px 6px 0px rgba(0, 0, 0, 0.4);
+        transition: transform 0.2s;
+
+        display: flex;
+        flex-direction: column;
+        gap: 20px; /* Added spacing between items inside card */
+      }
+
+      .section:hover {
+        transform: translate(-2px, -2px);
+        box-shadow: 8px 8px 0px rgba(0, 0, 0, 0.4);
+        border-color: #667eea;
+      }
+
+      /* Make some sections span full width if needed */
+      .section.full-width {
+        grid-column: 1 / -1;
+      }
+
+      /* Last card horizontal fill logic */
+      .section:last-of-type {
+        grid-column: 1 / -1;
+      }
+
+      /* Ensure button group at bottom spans full width */
+      .content > .button-group {
+        grid-column: 1 / -1;
+        width: 100%;
+        display: flex;
+        justify-content: flex-end;
+        border-top: 1px solid #333;
+        padding-top: 20px;
+        margin-top: 10px;
+      }
+
+      .section:nth-child(1) {
+        animation-delay: 0.1s;
+      }
+      .section:nth-child(2) {
+        animation-delay: 0.2s;
+      }
+      .section:nth-child(3) {
+        animation-delay: 0.3s;
+      }
+      .section:nth-child(4) {
+        animation-delay: 0.4s;
+      }
+      .section:nth-child(5) {
+        animation-delay: 0.5s;
+      }
+
+      .section:last-child {
+        margin-bottom: 0;
+      }
+
+      @keyframes fadeInUp {
+        from {
+          opacity: 0;
+          transform: translateY(20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .section-title svg {
+        width: 24px;
+        height: 24px;
+        stroke: #00ff9d;
+      }
+
+      .form-group {
+        margin-bottom: 20px;
+      }
+
+      label {
+        display: block;
+        font-weight: 600;
+        margin-bottom: 8px;
+        color: #aaa;
+        font-family: inherit;
+      }
+
+      input[type="text"],
+      input[type="password"],
+      input[type="number"],
+      textarea {
+        width: 100%;
+        padding: 12px;
+        border: 2px solid #555;
+        border-radius: 4px;
+        font-size: 14px;
+        font-family: "Courier New", Courier, monospace;
+        background: #121212;
+        color: #00ff9d;
+        transition: border-color 0.3s;
+      }
+
+      input[type="text"]:focus,
+      input[type="password"]:focus,
+      input[type="number"]:focus,
+      textarea:focus {
+        outline: none;
+        border-color: #00ff9d;
+        box-shadow: 0 0 10px rgba(0, 255, 157, 0.2);
+      }
+
+      button,
+      .button {
+        background: #333;
+        color: #00ff9d;
+        border: 2px solid #00ff9d;
+        padding: 16px 32px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 700;
+        font-family: "Courier New", Courier, monospace;
+        text-transform: uppercase;
+        transition: all 0.2s;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        box-shadow: 4px 4px 0px #111;
+      }
+
+      button:hover,
+      .button:hover {
+        background: #00ff9d;
+        color: #121212;
+        transform: translate(-1px, -1px);
+        box-shadow: 6px 6px 0px #111;
+      }
+
+      button:active,
+      .button:active {
+        transform: translate(1px, 1px);
+        box-shadow: 2px 2px 0px #111;
+      }
+
+      button.secondary {
+        background: #333;
+        border-color: #aaa;
+        color: #aaa;
+      }
+
+      button.secondary:hover {
+        background: #aaa;
+        color: #121212;
+      }
+
+      button.danger {
+        background: #333;
+        border-color: #ff4d4d;
+        color: #ff4d4d;
+      }
+
+      button.danger:hover {
+        background: #ff4d4d;
+        color: white;
+      }
+
+      button.success {
+        background: #333;
+        border-color: #28a745;
+        color: #28a745;
+        transition: all 0.3s;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+
+        border-radius: 4px;
+        margin-bottom: 10px;
+        border: 1px solid #444;
+      }
+
+      .api-key-item .source {
+        font-weight: 600;
+        min-width: 100px;
+        color: #00ff9d;
+      }
+
+      .api-key-item .key {
+        flex: 1;
+        font-family: monospace;
+        font-size: 13px;
+        color: #999;
+      }
+
+      button.secondary:hover {
+        background: #5a6268;
+        color: black;
+        font-weight: bold;
+      }
+
+      button.danger {
+        background: #dc3545;
+        color: black;
+        font-weight: bold;
+      }
+
+      button.danger:hover {
+        background: #c82333;
+        color: black;
+        font-weight: bold;
+      }
+
+      button.success {
+        background: #28a745;
+        color: black;
+        font-weight: bold;
+      }
+
+      button.success:hover {
+        background: #218838;
+        color: black;
+        font-weight: bold;
+      }
+
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      .api-key-item {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        padding: 12px;
+        border-radius: 8px;
+        margin-bottom: 10px;
+        border: 1px solid black;
+        box-shadow: 4px 4px 0 #111;
+      }
+
+      .api-key-item .source {
+        font-weight: 600;
+        min-width: 100px;
+        color: #667eea;
+      }
+
+      .api-key-item .key {
+        flex: 1;
+        font-family: monospace;
+        font-size: 13px;
+        color: #ff0000;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .api-key-item .status {
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 500;
+      }
+
+      .setting-description {
+        color: #999;
+      }
+
+      .stat-card {
+        background: #222;
+        color: #00ff9d;
+        padding: 20px;
+        border-radius: 8px;
+        text-align: center;
+        border: 2px solid #333;
+        box-shadow: 4px 4px 0 #111;
       }
 
       .stat-card .value {
-        font-size: 24px;
+        font-size: 32px;
+        font-weight: 700;
+        margin-bottom: 5px;
+        font-family: "Courier New", Courier, monospace;
       }
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <header>
-      <div class="header-content">
-        <div class="title-section">
-          <h1>⚙️ Random Wallpaper Settings</h1>
-          <p class="subtitle">Configure your wallpaper experience</p>
-        </div>
-        <div class="header-actions">
-          <div id="loadingIndicator" class="loading-indicator" style="display: none;">
-            <div class="spinner"></div>
+
+      .stat-card.secondary {
+        background: #222;
+        color: black;
+        border-color: #ff00de;
+        font-weight: bold;
+      }
+
+      .stat-card.tertiary {
+        border-color: #00f2fe;
+        background: #222;
+        color: black;
+        font-weight: bold;
+      }
+
+      .checkbox-label {
+        flex: 1;
+        color: #333;
+      }
+
+      .checkbox-label strong {
+        display: block;
+        margin-bottom: 4px;
+        color: #333;
+        font-weight: bold;
+      }
+
+      .setting-description {
+        font-size: 13px;
+        color: #666;
+        font-weight: bold;
+        line-height: 1.4;
+      }
+
+      .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 15px;
+      }
+
+      .stat-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        font-weight: bold;
+        padding: 20px;
+        border-radius: 8px;
+        text-align: center;
+      }
+
+      .stat-card .value {
+        font-size: 32px;
+        font-weight: 700;
+        margin-bottom: 5px;
+      }
+
+      .stat-card .label {
+        font-size: 13px;
+        opacity: 0.9;
+      }
+
+      .stat-card.secondary {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+      }
+
+      .stat-card.tertiary {
+        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+      }
+
+      .message {
+        padding: 8px 16px;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 500;
+        display: none;
+        align-items: center;
+        gap: 8px;
+        margin-top: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        backdrop-filter: blur(10px);
+      }
+
+      .message.show {
+        display: flex;
+      }
+
+      .message.success {
+        background: rgba(212, 237, 218, 0.95);
+        color: #155724;
+        border-color: rgba(195, 230, 203, 0.8);
+      }
+
+      .message.error {
+        background: rgba(248, 215, 218, 0.95);
+        color: #721c24;
+        border-color: rgba(245, 198, 203, 0.8);
+      }
+
+      .message.info {
+        background: rgba(209, 236, 241, 0.95);
+        color: #0c5460;
+        border-color: rgba(190, 229, 235, 0.8);
+      }
+
+      .help-text {
+        font-size: 13px;
+        color: #6c757d;
+        margin-top: 5px;
+      }
+
+      .button-group {
+        display: flex;
+        gap: 10px;
+        margin-top: 20px;
+      }
+
+      .slider-group {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+      }
+
+      input[type="range"] {
+        flex: 1;
+        height: 6px;
+        border-radius: 3px;
+        background: #444;
+        outline: none;
+      }
+
+      input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: #00ff9d;
+        cursor: pointer;
+        box-shadow: 0 0 5px #00ff9d;
+      }
+
+      input[type="range"]::-moz-range-thumb {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: #00ff9d;
+        cursor: pointer;
+        border: none;
+        box-shadow: 0 0 5px #00ff9d;
+      }
+
+      .interval-display {
+        min-width: 80px;
+        text-align: center;
+        font-weight: 600;
+        color: #00ff9d;
+        font-family: "Courier New", Courier, monospace;
+      }
+
+      /* Responsive Design */
+      @media (max-width: 768px) {
+        .container {
+          max-width: 100%;
+          height: 100vh;
+        }
+
+        header {
+          padding: 20px;
+        }
+
+        h1 {
+          font-size: 24px;
+        }
+
+        .content {
+          padding: 20px;
+        }
+
+        .stats-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .button-group {
+          flex-direction: column;
+        }
+
+        .button-group button {
+          width: 100%;
+        }
+      }
+
+      @media (max-width: 480px) {
+        header {
+          padding: 15px;
+        }
+
+        h1 {
+          font-size: 20px;
+        }
+
+        .content {
+          padding: 15px;
+        }
+
+        .stat-card .value {
+          font-size: 24px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <div class="header-content">
+          <div class="title-section">
+            <h1>⚙️ Random Wallpaper Settings</h1>
+            <p class="subtitle">Configure your wallpaper experience</p>
           </div>
-        </div>
-      </div>
-      <div id="message" class="message"></div>
-    </header>
-
-    <div class="content">
-
-      <!-- API Keys Section -->
-      <section class="section">
-        <h2 class="section-title">
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
-          </svg>
-          API Keys
-        </h2>
-
-        <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-          <p style="font-size: 14px; color: #666; margin-bottom: 10px;">
-            ℹ️ <strong>Single API Support:</strong> You can use just Unsplash OR Pexels, or configure both!
-          </p>
-          <div id="apiStatus" style="display: flex; gap: 15px; font-size: 13px;">
-            <div id="unsplashStatus">📷 Unsplash: <span style="color: #dc3545; font-weight: 600;">Not Configured</span></div>
-            <div id="pexelsStatus">🖼️ Pexels: <span style="color: #dc3545; font-weight: 600;">Not Configured</span></div>
-          </div>
-        </div>
-
-        <div id="apiKeysList"></div>
-
-        <div class="form-group">
-          <label>Add New API Key</label>
-          <div class="input-group">
-            <div>
-              <select id="apiSource" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px;">
-                <option value="unsplash">Unsplash</option>
-                <option value="pexels">Pexels</option>
-              </select>
+          <div class="header-actions">
+            <button id="saveSettingsBtn" class="success">
+              <svg
+                width="16"
+                height="16"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M5 13l4 4L19 7"
+                />
+              </svg>
+              Save Settings
+            </button>
+             <button id="resetSettingsBtn" class="danger">
+              Reset to Defaults
+            </button>
+            <a
+              href="newTab.html"
+              class="button"
+              style="text-decoration: none; padding: 10px 20px; font-size: 13px"
+            >
+              <svg
+                width="16"
+                height="16"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                style="margin-right: 5px"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M10 19l-7-7m0 0l7-7m-7 7h18"
+                />
+              </svg>
+              Back to New Tab
+            </a>
+           
+            <div
+              id="loadingIndicator"
+              class="loading-indicator"
+              style="display: none"
+            >
+              <div class="spinner"></div>
             </div>
-            <div style="flex: 2;">
-              <input type="password" id="apiKeyInput" placeholder="Enter API key">
-            </div>
-            <button id="addApiKeyBtn">Add Key</button>
-            <button id="testApiKeyBtn" class="secondary">Test</button>
           </div>
         </div>
-      </section>
+        <div id="message" class="message"></div>
+      </header>
 
-      <!-- Search Preferences Section -->
-      <section class="section">
-        <h2 class="section-title">
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-          </svg>
-          Search Preferences
-        </h2>
-
-        <div class="form-group">
-          <label>Unsplash Keywords (comma-separated)</label>
-          <textarea id="unsplashKeywords" placeholder="nature, landscape, mountains, ocean"></textarea>
-          <p class="help-text">Leave empty for random curated images</p>
-        </div>
-
-        <div class="form-group">
-          <label>Pexels Keywords (comma-separated)</label>
-          <textarea id="pexelsKeywords" placeholder="nature, landscape, mountains, ocean"></textarea>
-          <p class="help-text">Leave empty for random curated images</p>
-        </div>
-      </section>
-
-      <!-- Auto Refresh Section -->
-      <section class="section">
-        <h2 class="section-title">
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-          </svg>
-          Auto Refresh
-        </h2>
-
-        <div class="checkbox-group">
-          <input type="checkbox" id="autoRefreshEnabled">
-          <label for="autoRefreshEnabled" style="margin: 0;">Enable auto image refresh on new tab page</label>
-        </div>
-
-        <div class="form-group">
-          <label>Refresh Interval (seconds)</label>
-          <div class="slider-group">
-            <input type="range" id="autoRefreshInterval" min="5" max="300" step="5" value="30">
-            <span class="interval-display" id="intervalDisplay">30s</span>
-          </div>
-          <p class="help-text">Automatically change to a new random image while viewing the new tab</p>
-        </div>
-      </section>
-
-      <!-- Clock Settings Section -->
-      <section class="section">
-        <h2 class="section-title">
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-          </svg>
-          Clock & Date
-        </h2>
-
-        <div class="checkbox-group">
-          <input type="checkbox" id="clockEnabled">
-          <label for="clockEnabled" style="margin: 0;">Show clock on new tab page</label>
-        </div>
-
-        <div class="checkbox-group">
-          <input type="checkbox" id="clock24Hour">
-          <label for="clock24Hour" style="margin: 0;">Use 24-hour format</label>
-        </div>
-
-        <div class="checkbox-group">
-          <input type="checkbox" id="clockShowSeconds">
-          <label for="clockShowSeconds" style="margin: 0;">Show seconds</label>
-        </div>
-
-        <div class="checkbox-group">
-          <input type="checkbox" id="clockShowDate">
-          <label for="clockShowDate" style="margin: 0;">Show date</label>
-        </div>
-      </section>
-
-      <!-- History Navigation Section -->
-      <section class="section">
-        <h2 class="section-title">
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z M3 12a9 9 0 0118 0"/>
-          </svg>
-          📜 Image History
-        </h2>
-
-        <div class="checkbox-group">
-          <input type="checkbox" id="historyEnabled">
-          <label for="historyEnabled" style="margin: 0;">Enable image history navigation</label>
-        </div>
-
-        <p class="help-text" style="margin: 10px 0 15px;">
-          Navigate through previously displayed images using arrow buttons or keyboard shortcuts (← / →)
-        </p>
-
-        <div class="form-group">
-          <label for="historyMaxSize">
-            Maximum History Size: <span id="historySizeDisplay">15</span> images
-          </label>
-          <input type="range" id="historyMaxSize" min="5" max="50" step="5" value="15" style="width: 100%;">
-          <p class="help-text">Number of previous images to remember (5-50)</p>
-        </div>
-
-        <div class="stats-grid" style="margin-top: 20px;">
-          <div class="stat-card">
-            <div class="value" id="historyCount">0</div>
-            <div class="label">Images in History</div>
-          </div>
-        </div>
-
-        <div style="margin-top: 15px;">
-          <button id="clearHistoryBtn" class="secondary" style="width: auto;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+      <div class="content">
+        <!-- API Keys Section -->
+        <section class="section">
+          <h2 class="section-title">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
+              />
             </svg>
-            Clear History
-          </button>
-        </div>
-      </section>
+            API Keys
+          </h2>
 
-      <!-- Cache Settings Section -->
-      <section class="section">
-        <h2 class="section-title">
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"/>
-          </svg>
-          Cache Settings
-        </h2>
-
-        <div class="form-group">
-          <label class="checkbox-container">
-            <input type="checkbox" id="permanentCacheEnabled">
-            <span class="checkbox-label">
-              <strong>Permanent Cache Mode</strong>
-              <div class="setting-description">
-                When enabled, cached images are stored forever and will never be automatically deleted. 
-                You can manually refresh the cache using the "Force Refresh Cache" button below.
+          <div
+            style="
+              background: #222;
+              padding: 15px;
+              border-radius: 8px;
+              border: 1px solid #444;
+              margin-bottom: 20px;
+            "
+          >
+            <p style="font-size: 14px; color: #aaa; margin-bottom: 10px">
+              ℹ️ <strong>Single API Support:</strong> You can use just Unsplash
+              OR Pexels, or configure both!
+            </p>
+            <div
+              id="apiStatus"
+              style="display: flex; gap: 15px; font-size: 13px; color: #e0e0e0"
+            >
+              <div id="unsplashStatus">
+                📷 Unsplash:
+                <span style="color: #ff4d4d; font-weight: 600"
+                  >Not Configured</span
+                >
               </div>
-            </span>
-          </label>
-        </div>
+              <div id="pexelsStatus">
+                🖼️ Pexels:
+                <span style="color: #ff4d4d; font-weight: 600"
+                  >Not Configured</span
+                >
+              </div>
+            </div>
+          </div>
+          <div id="apiKeysList"></div>
 
-        <div class="form-group">
-          <button id="forceRefreshCacheBtn" class="secondary">
-            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+          <div class="form-group">
+            <label>Add New API Key</label>
+            <div class="input-group">
+              <div>
+                <select
+                  id="apiSource"
+                  style="
+                    width: 100%;
+                    padding: 12px;
+                    border: 2px solid #555;
+                    border-radius: 8px;
+                    font-size: 14px;
+                  "
+                >
+                  <option value="unsplash">Unsplash</option>
+                  <option value="pexels">Pexels</option>
+                </select>
+              </div>
+              <div style="flex: 2; margin-top: 10px; margin-bottom: 10px">
+                <input
+                  type="password"
+                  id="apiKeyInput"
+                  placeholder="Enter API key"
+                />
+              </div>
+              <button id="addApiKeyBtn">Add Key</button>
+              <button id="testApiKeyBtn" class="secondary">Test</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Search Preferences Section -->
+        <section class="section">
+          <h2 class="section-title">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
             </svg>
-            Force Refresh Cache
-          </button>
-          <div class="setting-description" style="margin-top: 8px;">
-            Manually fetch new images from APIs and replace the current cache (works regardless of permanent cache setting).
-          </div>
-        </div>
-      </section>
+            Search Preferences
+          </h2>
 
-      <!-- Cache Statistics Section -->
-      <section class="section">
-        <h2 class="section-title">
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
-          </svg>
-          Cache Statistics
-        </h2>
+          <div class="form-group">
+            <label>Unsplash Keywords (comma-separated)</label>
+            <textarea
+              id="unsplashKeywords"
+              placeholder="nature, landscape, mountains, ocean"
+            ></textarea>
+            <p class="help-text">Leave empty for random curated images</p>
+          </div>
 
-        <div class="stats-grid">
-          <div class="stat-card">
-            <div class="value" id="totalItems">0</div>
-            <div class="label">Total Items</div>
+          <div class="form-group">
+            <label>Pexels Keywords (comma-separated)</label>
+            <textarea
+              id="pexelsKeywords"
+              placeholder="nature, landscape, mountains, ocean"
+            ></textarea>
+            <p class="help-text">Leave empty for random curated images</p>
           </div>
-          <div class="stat-card secondary">
-            <div class="value" id="validItems">0</div>
-            <div class="label">Valid Items</div>
-          </div>
-          <div class="stat-card tertiary">
-            <div class="value" id="expiredItems">0</div>
-            <div class="label">Expired Items</div>
-          </div>
-        </div>
+        </section>
 
-        <div class="stats-grid" style="margin-top: 15px;">
-          <div class="stat-card">
-            <div class="value" id="unsplashCount">0</div>
-            <div class="label">Unsplash</div>
-          </div>
-          <div class="stat-card secondary">
-            <div class="value" id="pexelsCount">0</div>
-            <div class="label">Pexels</div>
-          </div>
-          <div class="stat-card tertiary">
-            <div class="value" id="lastFetchTime">Never</div>
-            <div class="label">Last Fetch</div>
-          </div>
-        </div>
-
-        <div class="button-group">
-          <button id="refreshStatsBtn" class="secondary">
-            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+        <!-- Auto Refresh Section -->
+        <section class="section">
+          <h2 class="section-title">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              />
             </svg>
-            Refresh Stats
-          </button>
-          <button id="clearCacheBtn" class="danger">
-            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-            </svg>
-            Clear Cache
-          </button>
-        </div>
-      </section>
+            Auto Refresh
+          </h2>
 
-      <!-- Save Settings -->
-      <div class="button-group">
-        <button id="saveSettingsBtn" class="success">
-          <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-          </svg>
-          Save Settings
-        </button>
-        <button id="resetSettingsBtn" class="danger">Reset to Defaults</button>
+          <div class="checkbox-group">
+            <input type="checkbox" id="autoRefreshEnabled" />
+            <label for="autoRefreshEnabled" style="margin: 0"
+              >Enable auto image refresh on new tab page</label
+            >
+          </div>
+
+          <div class="form-group">
+            <label>Refresh Interval (seconds)</label>
+            <div class="slider-group">
+              <input
+                type="range"
+                id="autoRefreshInterval"
+                min="5"
+                max="300"
+                step="5"
+                value="30"
+              />
+              <span class="interval-display" id="intervalDisplay">30s</span>
+            </div>
+            <p class="help-text">
+              Automatically change to a new random image while viewing the new
+              tab
+            </p>
+          </div>
+        </section>
+
+        <!-- Clock Settings Section -->
+        <section class="section">
+          <h2 class="section-title">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+            Clock & Date
+          </h2>
+
+          <div class="checkbox-group">
+            <input type="checkbox" id="clockEnabled" />
+            <label for="clockEnabled" style="margin: 0"
+              >Show clock on new tab page</label
+            >
+          </div>
+
+          <div class="checkbox-group">
+            <input type="checkbox" id="clock24Hour" />
+            <label for="clock24Hour" style="margin: 0"
+              >Use 24-hour format</label
+            >
+          </div>
+
+          <div class="checkbox-group">
+            <input type="checkbox" id="clockShowSeconds" />
+            <label for="clockShowSeconds" style="margin: 0">Show seconds</label>
+          </div>
+
+          <div class="checkbox-group">
+            <input type="checkbox" id="clockShowDate" />
+            <label for="clockShowDate" style="margin: 0">Show date</label>
+          </div>
+        </section>
+
+        <!-- History Navigation Section -->
+        <section class="section">
+          <h2 class="section-title">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z M3 12a9 9 0 0118 0"
+              />
+            </svg>
+            📜 Image History
+          </h2>
+
+          <div class="checkbox-group">
+            <input type="checkbox" id="historyEnabled" />
+            <label for="historyEnabled" style="margin: 0"
+              >Enable image history navigation</label
+            >
+          </div>
+
+          <p class="help-text" style="margin: 10px 0 15px">
+            Navigate through previously displayed images using arrow buttons or
+            keyboard shortcuts (← / →)
+          </p>
+
+          <div class="form-group">
+            <label for="historyMaxSize">
+              Maximum History Size:
+              <span id="historySizeDisplay">15</span> images
+            </label>
+            <input
+              type="range"
+              id="historyMaxSize"
+              min="5"
+              max="50"
+              step="5"
+              value="15"
+              style="width: 100%"
+            />
+            <p class="help-text">
+              Number of previous images to remember (5-50)
+            </p>
+          </div>
+
+          <div class="stats-grid" style="margin-top: 20px">
+            <div class="stat-card">
+              <div class="value" id="historyCount">0</div>
+              <div class="label">Images in History</div>
+            </div>
+          </div>
+
+          <div style="margin-top: 15px">
+            <button id="clearHistoryBtn" class="secondary" style="width: auto">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path
+                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                />
+              </svg>
+              Clear History
+            </button>
+          </div>
+        </section>
+
+        <!-- Cache Settings Section -->
+        <section class="section">
+          <h2 class="section-title">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"
+              />
+            </svg>
+            Cache Settings
+          </h2>
+
+          <div class="form-group">
+            <label class="checkbox-container">
+              <input type="checkbox" id="permanentCacheEnabled" />
+              <span class="checkbox-label">
+                <label for="permanentCacheEnabled">Permanent Cache Mode</label>
+                <div class="setting-description">
+                  When enabled, cached images are stored forever and will never
+                  be automatically deleted. You can manually refresh the cache
+                  using the "Force Refresh Cache" button below.
+                </div>
+              </span>
+            </label>
+          </div>
+
+          <div class="form-group">
+            <button id="forceRefreshCacheBtn" class="secondary">
+              <svg
+                width="16"
+                height="16"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                />
+              </svg>
+              Force Refresh Cache
+            </button>
+            <div class="setting-description" style="margin-top: 8px">
+              Manually fetch new images from APIs and replace the current cache
+              (works regardless of permanent cache setting).
+            </div>
+          </div>
+        </section>
+
+        <!-- Cache Statistics Section -->
+        <section class="section">
+          <h2 class="section-title">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+              />
+            </svg>
+            Cache Statistics
+          </h2>
+
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="value" id="totalItems">0</div>
+              <div class="label">Total Items</div>
+            </div>
+            <div class="stat-card secondary">
+              <div class="value" id="validItems">0</div>
+              <div class="label">Valid Items</div>
+            </div>
+            <div class="stat-card tertiary">
+              <div class="value" id="expiredItems">0</div>
+              <div class="label">Expired Items</div>
+            </div>
+          </div>
+
+          <div class="stats-grid" style="margin-top: 15px">
+            <div class="stat-card">
+              <div class="value" id="unsplashCount">0</div>
+              <div class="label">Unsplash</div>
+            </div>
+            <div class="stat-card secondary">
+              <div class="value" id="pexelsCount">0</div>
+              <div class="label">Pexels</div>
+            </div>
+            <div class="stat-card tertiary">
+              <div class="value" id="lastFetchTime">Never</div>
+              <div class="label">Last Fetch</div>
+            </div>
+          </div>
+
+          <div class="button-group">
+            <button id="refreshStatsBtn" class="secondary">
+              <svg
+                width="16"
+                height="16"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                />
+              </svg>
+              Refresh Stats
+            </button>
+            <button id="clearCacheBtn" class="danger">
+              <svg
+                width="16"
+                height="16"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                />
+              </svg>
+              Clear Cache
+            </button>
+          </div>
+        </section>
+
+        <!-- Save Settings -->
+        <div class="button-group"></div>
       </div>
     </div>
-  </div>
 
-  <script type="module" src="options.js"></script>
-</body>
+    <script type="module" src="options.js"></script>
+  </body>
 </html>

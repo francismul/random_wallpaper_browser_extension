@@ -4,6 +4,7 @@ import {
   METADATA_STORE_NAME,
   IMAGES_STORE_NAME,
   HISTORY_STORE_NAME,
+  PERMANENT_CACHE_EXPIRY_MS,
 } from "../config/constants";
 import { getRandomIndex } from "../utils/random";
 
@@ -353,6 +354,71 @@ export async function clearAllImages(): Promise<void> {
       db.close();
       reject(request.error);
     };
+  });
+}
+
+/**
+ * Update all images to have permanent cache expiry dates
+ * Sets expiresAt to a far future date (100 years from now)
+ * Used when permanent cache mode is enabled
+ * @returns Promise that resolves to the number of images updated
+ * @throws Error if database operation fails
+ */
+export async function setAllImagesToPermanentCache(): Promise<number> {
+  const db = await initDB();
+  const transaction = db.transaction([IMAGES_STORE_NAME], "readwrite");
+  const store = transaction.objectStore(IMAGES_STORE_NAME);
+  
+  const permanentExpiryDate = Date.now() + PERMANENT_CACHE_EXPIRY_MS;
+  let updatedCount = 0;
+
+  return new Promise((resolve, reject) => {
+    const cursorRequest = store.openCursor();
+
+    cursorRequest.onsuccess = (event) => {
+      const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
+
+      if (cursor) {
+        const image = cursor.value as ImageData;
+        
+        // Update the expiresAt field to far future date
+        image.expiresAt = permanentExpiryDate;
+        
+        const updateRequest = cursor.update(image);
+        
+        updateRequest.onsuccess = () => {
+          updatedCount++;
+          cursor.continue();
+        };
+        
+        updateRequest.onerror = () => {
+          db.close();
+          reject(updateRequest.error);
+        };
+      } else {
+        // No more entries
+        db.close();
+        resolve(updatedCount);
+      }
+    };
+
+    cursorRequest.onerror = () => {
+      db.close();
+      reject(cursorRequest.error);
+    };
+  });
+}
+
+/**
+ * Gets the permanent cache mode setting from Chrome storage
+ * @returns Promise that resolves to true if permanent cache mode is enabled
+ */
+export async function isPermanentCacheEnabled(): Promise<boolean> {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(['settings'], (result: any) => {
+      const settings = result.settings || {};
+      resolve(settings.cache?.permanentMode ?? false);
+    });
   });
 }
 

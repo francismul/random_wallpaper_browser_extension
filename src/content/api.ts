@@ -2,6 +2,7 @@ import {
   IMAGE_EXPIRY_HOURS,
   PEXELS_IMAGES_COUNT,
   UNSPLASH_IMAGES_COUNT,
+  PERMANENT_CACHE_EXPIRY_MS,
 } from "../config/constants";
 import { getRandomIndex } from "../utils/random";
 import { recordApiRequest } from "./fallback";
@@ -91,6 +92,19 @@ function getRandomKey(keys: string[]): string | null {
 }
 
 /**
+ * Checks if permanent cache mode is enabled in settings
+ * @returns Promise that resolves to true if permanent cache mode is enabled
+ */
+async function isPermanentCacheEnabled(): Promise<boolean> {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(['settings'], (result: any) => {
+      const settings = result.settings || {};
+      resolve(settings.cache?.permanentMode ?? false);
+    });
+  });
+}
+
+/**
  * Fetches random landscape images from Unsplash API
  * Downloads images as blobs for offline access and applies expiration timestamps
  * @param apiKey - Unsplash API key for authentication
@@ -139,7 +153,12 @@ async function fetchUnsplashImages(
 
     const data = await response.json();
     const now = Date.now();
-    const expiresAt = now + IMAGE_EXPIRY_HOURS * 60 * 60 * 1000;
+    
+    // Check if permanent cache mode is enabled
+    const permanentCache = await isPermanentCacheEnabled();
+    const expiresAt = permanentCache 
+      ? now + PERMANENT_CACHE_EXPIRY_MS 
+      : now + IMAGE_EXPIRY_HOURS * 60 * 60 * 1000;
 
     // Download images as blobs for offline support
     const imagePromises = data.map(async (photo: any) => {
@@ -223,7 +242,12 @@ async function fetchPexelsImages(
 
     const data = await response.json();
     const now = Date.now();
-    const expiresAt = now + IMAGE_EXPIRY_HOURS * 60 * 60 * 1000;
+    
+    // Check if permanent cache mode is enabled
+    const permanentCache = await isPermanentCacheEnabled();
+    const expiresAt = permanentCache 
+      ? now + PERMANENT_CACHE_EXPIRY_MS 
+      : now + IMAGE_EXPIRY_HOURS * 60 * 60 * 1000;
 
     // Download images as blobs for offline support
     const imagePromises = data.photos.map(async (photo: any) => {

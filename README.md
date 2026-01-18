@@ -31,10 +31,10 @@ First, build the extension (you can add API keys later through the options page)
 
 ```bash
 # Install dependencies
-npm install
+pnpm install
 
 # Build the extension
-npm run build
+pnpm run build
 ```
 
 or use build scripts (Windows)

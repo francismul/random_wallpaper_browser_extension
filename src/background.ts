@@ -14,6 +14,7 @@ import {
   getAllValidImages,
   getDatabaseStats,
   getValidImageCount,
+  setAllImagesToPermanentCache,
 } from "./content/db.js";
 import {
   getFallbackImages,
@@ -126,7 +127,7 @@ async function refreshImages(): Promise<void> {
   console.log("⬇️ Downloading images as blobs for offline support...");
 
   try {
-    // Step 1: Check cache settings and conditionally clean expired images
+    // Step 1: Check cache settings and handle permanent cache mode
     console.log("🔍 Checking cache settings...");
     const settings = await new Promise<any>((resolve) => {
       chrome.storage.local.get(['settings'], (result) => {
@@ -137,15 +138,18 @@ async function refreshImages(): Promise<void> {
     const permanentCacheEnabled = settings.cache?.permanentMode ?? false;
     
     if (permanentCacheEnabled) {
-      console.log("🔒 Permanent cache mode enabled - skipping expired image cleanup");
+      console.log("🔒 Permanent cache mode enabled - updating all images to permanent expiry...");
+      const updatedCount = await setAllImagesToPermanentCache();
+      console.log(`✅ Updated ${updatedCount} images to permanent cache expiry`);
+    }
+
+    // Step 2: Clean expired images (will only delete if expiry dates are in the past)
+    console.log("🧹 Cleaning expired images...");
+    const deletedCount = await cleanExpiredImages();
+    if (deletedCount > 0) {
+      console.log(`✅ Cleaned ${deletedCount} expired images`);
     } else {
-      console.log("🧹 Cleaning expired images...");
-      const deletedCount = await cleanExpiredImages();
-      if (deletedCount > 0) {
-        console.log(`✅ Cleaned ${deletedCount} expired images`);
-      } else {
-        console.log("✅ No expired images to clean");
-      }
+      console.log("✅ No expired images to clean");
     }
 
     // Step 2: Get current database statistics for monitoring
