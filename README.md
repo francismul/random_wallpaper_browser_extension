@@ -31,27 +31,10 @@ First, build the extension (you can add API keys later through the options page)
 
 ```bash
 # Install dependencies
-npm install
+pnpm install
 
 # Build the extension
-npm run build
-```
-
-or use build scripts (Windows)
-
-```powershell
-# command prompt / powershell
-setup.bat
-
-# or
-setup.ps1
-```
-
-(Linux/Mac users can use)
-
-```bash
-chmod +x setup.sh
-./setup.sh
+pnpm run build
 ```
 
 ### 2. Load in Browser

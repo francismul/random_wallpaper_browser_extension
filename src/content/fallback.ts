@@ -1,5 +1,19 @@
 import { FALLBACK_IMAGES } from "../config/fallbackImgUrls";
+import { IMAGE_EXPIRY_HOURS, PERMANENT_CACHE_EXPIRY_MS } from "../config/constants";
 import type { ImageData as DbImageData } from "./db";
+
+/**
+ * Checks if permanent cache mode is enabled in settings
+ * @returns Promise that resolves to true if permanent cache mode is enabled
+ */
+async function isPermanentCacheEnabled(): Promise<boolean> {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(['settings'], (result: any) => {
+      const settings = result.settings || {};
+      resolve(settings.cache?.permanentMode ?? false);
+    });
+  });
+}
 
 /**
  * Generates a beautiful offline placeholder image using Canvas API
@@ -8,7 +22,12 @@ import type { ImageData as DbImageData } from "./db";
  */
 async function generateOfflinePlaceholder(): Promise<DbImageData> {
   const now = Date.now();
-  const expiresAt = now + 24 * 60 * 60 * 1000; // 24 hours
+  
+  // Check if permanent cache mode is enabled
+  const permanentCache = await isPermanentCacheEnabled();
+  const expiresAt = permanentCache 
+    ? now + PERMANENT_CACHE_EXPIRY_MS 
+    : now + IMAGE_EXPIRY_HOURS * 60 * 60 * 1000;
 
   const canvas = document.createElement("canvas");
   canvas.width = 1920;
@@ -55,7 +74,12 @@ async function generateOfflinePlaceholder(): Promise<DbImageData> {
  */
 export async function getFallbackImages(): Promise<DbImageData[]> {
   const now = Date.now();
-  const expiresAt = now + 24 * 60 * 60 * 1000; // 24 hours
+  
+  // Check if permanent cache mode is enabled
+  const permanentCache = await isPermanentCacheEnabled();
+  const expiresAt = permanentCache 
+    ? now + PERMANENT_CACHE_EXPIRY_MS 
+    : now + IMAGE_EXPIRY_HOURS * 60 * 60 * 1000;
 
   // Check if online - if offline, return placeholder immediately
   if (!navigator.onLine) {
@@ -397,6 +421,12 @@ export async function getImagesWithFallback(allowApiCalls: boolean = false): Pro
     } catch (placeholderError) {
       console.error('Even placeholder generation failed:', placeholderError);
       // Return a minimal fallback
+      const now = Date.now();
+      const permanentCache = await isPermanentCacheEnabled();
+      const expiresAt = permanentCache 
+        ? now + PERMANENT_CACHE_EXPIRY_MS 
+        : now + IMAGE_EXPIRY_HOURS * 60 * 60 * 1000;
+      
       return [{
         id: 'emergency_fallback',
         url: '',
@@ -405,8 +435,8 @@ export async function getImagesWithFallback(allowApiCalls: boolean = false): Pro
         downloadUrl: '',
         author: 'System',
         authorUrl: '',
-        timestamp: Date.now(),
-        expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+        timestamp: now,
+        expiresAt,
       }];
     }
   }

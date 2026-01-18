@@ -2,6 +2,11 @@ export const UNSPLASH_IMAGES_COUNT = 30; // Unsplash API maximum
 export const PEXELS_IMAGES_COUNT = 50; // Optimized from Pexels max of 80
 export const IMAGE_EXPIRY_HOURS = 24;
 
+// Permanent Cache Settings
+// Set expiry to 100 years in the future for permanent cache mode
+export const PERMANENT_CACHE_EXPIRY_YEARS = 100;
+export const PERMANENT_CACHE_EXPIRY_MS = PERMANENT_CACHE_EXPIRY_YEARS * 365 * 24 * 60 * 60 * 1000;
+
 // Refresh Intervals
 export const REFRESH_INTERVAL_HOURS = 6;
 export const REFRESH_INTERVAL_MS = REFRESH_INTERVAL_HOURS * 60 * 60 * 1000;

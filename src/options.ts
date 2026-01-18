@@ -1030,6 +1030,20 @@ function setupEventListeners(): void {
         };
 
         await saveSettings(currentSettings);
+        
+        // If permanent cache mode was enabled, update all existing images to permanent expiry
+        if (currentSettings.cache.permanentMode) {
+          try {
+            console.log('🔒 Permanent cache enabled - updating existing images...');
+            const { setAllImagesToPermanentCache } = await import('./content/db.js');
+            const updatedCount = await setAllImagesToPermanentCache();
+            console.log(`✅ Updated ${updatedCount} images to permanent cache expiry`);
+          } catch (error) {
+            console.error('Failed to update images to permanent cache:', error);
+            // Don't fail the save operation if this fails
+          }
+        }
+        
         showMessage('Settings saved successfully!', 'success');
 
         // Notify background script to reload settings

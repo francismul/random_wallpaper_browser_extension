@@ -5,16 +5,47 @@ All notable changes to the Random Wallpaper Extension will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-### In Progress
+## [3.0.0] - 2026-01-18
 
-- 🎬 **Video Backgrounds** - Reimplemented with better controls, performance optimization, and mute/unmute options
-- 💬 **Inspirational Quotes** - Customizable quote sources, styling options, and positioning controls
-- 🎨 **Image Filtering** - Filter by color, mood, or theme
-- 📁 **Custom Wallpaper Upload** - Upload and rotate your own images
-- 🎭 **Multiple Theme Presets** - Quick-switch between different aesthetic styles
-- 🌗 **Dark Mode Support** - Automatic theme switching based on time or system settings
+### Changed
 
-## [2.1.1] - 2025-10-XX
+#### **Improved Permanent cache logic**
+
+- All newly fetched images (API, fallback, placeholder) are assigned an expiry date 100 years in the future
+- All existing images in the database are updated to have the permanent expiry date
+- The cleanup job still runs normally but won't delete images with far-future expiry dates
+
+- **When permanent cache mode is disabled**:
+  - New images get the normal 24-hour expiry
+  - Existing images with permanent expiry will eventually be cleaned up as they reach expiration (100 years from when they were set)
+
+#### **Improved UI**
+
+- **New Tab Page**:
+  - Bento Layout: A customizable grid system now organizes the UI.
+
+- **Options Page**:
+  - Dark Mode Support: The entire page now defaults to a deep dark theme
+  - Bento Sections: Settings are now grouped into distinct "Bento cards" that float in a responsive grid layout. Bevelled edges and drop shadows give them dept
+
+### Added
+
+#### **Github Workflow**
+
+- Github workflow for 
+
+#### **pnpm package manager**
+
+- **pnpm** - Added pnpm as the default package manager for better dependencies management.
+- **Build Commands**:
+  - `pnpm run build` - Standard build (no obfuscation, fast development)
+  - `pnpm run build:obfuscated` - Basic obfuscated build
+  - `pnpm run build:light` - Light obfuscation (balanced readability vs protection)
+  - `pnpm run build:medium` - Medium obfuscation (recommended for production)
+  - `pnpm run build:heavy` - Heavy obfuscation (maximum code protection)
+  - `pnpm run build:fun` - Fun/experimental obfuscation level
+
+## [2.1.1] - 2025-10-20
 
 ### Added
 
