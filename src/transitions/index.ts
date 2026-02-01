@@ -44,6 +44,9 @@ export class CanvasTransitionManager {
     dh: number;
   } | null = null;
 
+  // Store resize handler reference for proper cleanup
+  private resizeHandler: () => void;
+
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
     // Get context with optimizations
@@ -57,15 +60,16 @@ export class CanvasTransitionManager {
     this.ctx = ctx;
     this.resizeCanvas();
 
-    // Handle window resize
-    window.addEventListener("resize", () => {
+    // Handle window resize - store handler for proper cleanup
+    this.resizeHandler = () => {
       this.resizeCanvas();
       // If resizing during transition, we might want to just finish it instantly or restart
       // For simplicity, we just redraw the current state
       if (!this.isTransitioning && this.currentImage) {
         this.renderImage(this.currentImage);
       }
-    });
+    };
+    window.addEventListener("resize", this.resizeHandler);
   }
 
   /**
@@ -640,6 +644,6 @@ export class CanvasTransitionManager {
    */
   destroy(): void {
     this.stopTransition();
-    window.removeEventListener("resize", () => this.resizeCanvas());
+    window.removeEventListener("resize", this.resizeHandler);
   }
 }
