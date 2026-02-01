@@ -195,7 +195,23 @@ async function refreshImages(): Promise<void> {
         background_logger.info(
           "Trying to download some default emergency images",
         );
-        await getFallbackImages();
+        const fallbackImages = await getFallbackImages();
+        if (fallbackImages && fallbackImages.length > 0) {
+          background_logger.info(
+            `Storing ${fallbackImages.length} emergency fallback images in IndexedDB...`,
+          );
+          await storeImages(fallbackImages);
+          const now = Date.now();
+          await setLastFetchTime(now);
+          backgroundState.lastRefresh = now;
+          background_logger.info(
+            `Successfully cached ${fallbackImages.length} emergency fallback images`,
+          );
+        } else {
+          background_logger.warn(
+            "Emergency fallback did not provide any images to cache",
+          );
+        }
       }
     } catch (emergencyError) {
       background_logger.error("Emergency fallback failed:", emergencyError);
