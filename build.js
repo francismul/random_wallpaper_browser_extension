@@ -44,20 +44,20 @@ const obfuscationConfigs = {
   medium: {
     compact: true,
     controlFlowFlattening: true,
-    controlFlowFlatteningThreshold: 0.5,
+    controlFlowFlatteningThreshold: 0.4, // Reduced for safety
     deadCodeInjection: true,
-    deadCodeInjectionThreshold: 0.2,
+    deadCodeInjectionThreshold: 0.15, // Reduced
     debugProtection: false,
     debugProtectionInterval: 0,
     disableConsoleOutput: false,
     identifierNamesGenerator: "hexadecimal",
     log: false,
     numbersToExpressions: true,
-    numbersToExpressionsThreshold: 0.5,
+    numbersToExpressionsThreshold: 0.4,
     renameGlobals: false,
     selfDefending: false,
     simplify: true,
-    splitStrings: true,
+    splitStrings: false, // DISABLED - breaks API URLs
     splitStringsChunkLength: 5,
     stringArray: true,
     stringArrayCallsTransform: true,
@@ -70,43 +70,68 @@ const obfuscationConfigs = {
     stringArrayWrappersChainedCalls: true,
     stringArrayWrappersParametersCount: 4,
     stringArrayWrappersType: "function",
-    stringArrayThreshold: 0.8,
-    transformObjectKeys: true,
+    stringArrayThreshold: 0.7, // Reduced from 0.8
+    transformObjectKeys: false, // DISABLED - breaks message action names
     unicodeEscapeSequence: false,
+    // Protect critical strings
+    reservedStrings: [
+      "chrome\\.runtime",
+      "chrome\\.storage", 
+      "chrome\\.alarms",
+      "action",
+      "https://api",
+    ],
   },
   heavy: {
     compact: true,
     controlFlowFlattening: true,
-    controlFlowFlatteningThreshold: 0.75,
+    controlFlowFlatteningThreshold: 0.5, // Reduced from 0.75 to avoid breaking async
     deadCodeInjection: true,
-    deadCodeInjectionThreshold: 0.4,
-    debugProtection: true,
-    debugProtectionInterval: 2000,
-    disableConsoleOutput: true,
+    deadCodeInjectionThreshold: 0.3, // Reduced from 0.4
+    debugProtection: false, // DISABLED - breaks Chrome extension APIs
+    debugProtectionInterval: 0, // DISABLED
+    disableConsoleOutput: false, // KEEP ENABLED for extension logging
     domainLock: [],
-    identifierNamesGenerator: "mangled",
+    identifierNamesGenerator: "hexadecimal", // Changed from "mangled" - safer for extensions
     log: false,
     numbersToExpressions: true,
-    numbersToExpressionsThreshold: 0.8,
+    numbersToExpressionsThreshold: 0.6, // Reduced from 0.8
     renameGlobals: false,
-    selfDefending: true,
+    selfDefending: false, // DISABLED - can break in extension context
     simplify: true,
-    splitStrings: true,
+    splitStrings: false, // DISABLED - breaks API URLs and action strings
     splitStringsChunkLength: 3,
     stringArray: true,
     stringArrayCallsTransform: true,
-    stringArrayCallsTransformThreshold: 0.8,
-    stringArrayEncoding: ["rc4"],
+    stringArrayCallsTransformThreshold: 0.6, // Reduced from 0.8
+    stringArrayEncoding: ["base64"], // Changed from "rc4" - rc4 is too aggressive
     stringArrayIndexShift: true,
     stringArrayRotate: true,
     stringArrayShuffle: true,
-    stringArrayWrappersCount: 5,
+    stringArrayWrappersCount: 3, // Reduced from 5
     stringArrayWrappersChainedCalls: true,
-    stringArrayWrappersParametersCount: 5,
+    stringArrayWrappersParametersCount: 3, // Reduced from 5
     stringArrayWrappersType: "function",
-    stringArrayThreshold: 0.9,
-    transformObjectKeys: true,
+    stringArrayThreshold: 0.75, // Reduced from 0.9
+    transformObjectKeys: false, // DISABLED - breaks chrome.runtime.sendMessage action names
     unicodeEscapeSequence: false,
+    // Add reserved strings to protect critical identifiers
+    reservedStrings: [
+      "chrome\\.runtime",
+      "chrome\\.storage",
+      "chrome\\.alarms",
+      "sendMessage",
+      "sendResponse",
+      "action",
+      "forceRefreshCache",
+      "forceRefresh",
+      "checkRefreshStatus",
+      "checkRefreshNeeded",
+      "apiKeysUpdated",
+      "settingsUpdated",
+      "https://api\\.unsplash\\.com",
+      "https://api\\.pexels\\.com",
+    ],
   },
   fun: {
     compact: false, // Keep readable for fun
@@ -174,15 +199,16 @@ async function obfuscateFiles() {
 const buildOptions = {
   entryPoints: {
     background: "src/background.ts",
-    newTab: "src/content/newTab.ts",
+    newTab: "src/newTab.ts",
     options: "src/options.ts",
+    
   },
   bundle: true,
   outdir: "dist",
   format: "esm",
   platform: "browser",
   target: "es2020",
-  sourcemap: !shouldObfuscate, // No sourcemaps when obfuscating for maximum mystery
+  sourcemap: false, // No sourcemaps when obfuscating for maximum mystery
   minify: !isWatch && !shouldObfuscate, // Let obfuscator handle minification
   splitting: false,
 };

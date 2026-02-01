@@ -30,8 +30,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       
-      - name: Build extension (heavy obfuscation)
-        run: pnpm build:heavy
+      - name: Build extension (fun obfuscation)
+        run: pnpm build:fun
       
       - name: Get version from package.json
         id: package_version

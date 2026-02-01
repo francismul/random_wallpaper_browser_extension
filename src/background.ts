@@ -4,76 +4,34 @@
  * Provides intelligent fallback handling, rate limiting awareness, and comprehensive error recovery
  */
 
-import { fetchAllImages } from "./content/api.js";
+import { fetchAllImages } from "./api";
 import {
-  storeImages,
-  getLastFetchTime,
-  setLastFetchTime,
   cleanExpiredImages,
-  initDB,
-  getAllValidImages,
-  getDatabaseStats,
+  getLastFetchTime,
+  getStorageInfo,
   getValidImageCount,
-  setAllImagesToPermanentCache,
-} from "./content/db.js";
+  initDB,
+  setLastFetchTime,
+  storeImages,
+} from "./db";
+import { getFallbackImages } from "./fallback";
 import {
-  getFallbackImages,
-  getImagesWithFallback,
-  getImageSourceStrategy,
-} from "./content/fallback.js";
-import {
+  ALARM_NAME,
+  DEFAULT_BACKGROUND_STATE,
+  IMMEDIATE_FETCH_COOLDOWN_MS,
+  MIN_STORAGE_THRESHOLD_GB,
   REFRESH_INTERVAL_HOURS,
   REFRESH_INTERVAL_MS,
-  ALARM_NAME,
-  IMMEDIATE_FETCH_COOLDOWN_MS,
-} from "./config/constants.js";
+} from "./config";
+import { Logger } from "./logger";
+import { getSettings } from "./storage";
+import { areApiKeysConfigured } from "./utils";
 
-/**
- * Interface for tracking background service worker operational state and statistics
- * Provides comprehensive monitoring of fetch operations, message handling, and performance metrics
- */
-interface BackgroundState {
-  /** Timestamp of when the service worker started */
-  startTime: number;
-  /** Timestamp of last successful image refresh */
-  lastRefresh: number | null;
-  /** Timestamp of last manual fetch (for rate limiting) */
-  lastManualFetch: number;
-  /** Total number of failed fetch attempts */
-  failedFetches: number;
-  /** Total number of successful fetch operations */
-  successfulFetches: number;
-  /** Total number of messages received */
-  messageCount: number;
-  /** Number of manual refresh requests */
-  manualRefreshCount: number;
-  /** Number of opportunistic refreshes triggered */
-  opportunisticRefreshCount: number;
-  /** Number of settings update notifications */
-  settingsUpdateCount: number;
-  /** Number of API key update notifications */
-  apiKeyUpdateCount: number;
-  /** Whether a fetch operation is currently in progress */
-  isFetching: boolean;
-}
+const background_logger = new Logger("Service worker");
 
-/**
- * Global background state for tracking operational metrics and preventing concurrent operations
- * Provides comprehensive monitoring and coordination of background service worker activities
- */
-const backgroundState: BackgroundState = {
-  startTime: Date.now(),
-  lastRefresh: null,
-  lastManualFetch: 0,
-  failedFetches: 0,
-  successfulFetches: 0,
-  messageCount: 0,
-  manualRefreshCount: 0,
-  opportunisticRefreshCount: 0,
-  settingsUpdateCount: 0,
-  apiKeyUpdateCount: 0,
-  isFetching: false,
-};
+background_logger.debug("Background script at your service. 🫡");
+
+const backgroundState = DEFAULT_BACKGROUND_STATE;
 
 /**
  * Checks if it's time to refresh images based on configured interval
@@ -85,7 +43,9 @@ async function shouldRefreshImages(): Promise<boolean> {
     const lastFetch = await getLastFetchTime();
 
     if (lastFetch === null) {
-      console.log("🔄 No previous fetch detected - initial refresh required");
+      background_logger.info(
+        "No previous fetch detected - initial refresh required",
+      );
       return true;
     }
 
@@ -94,16 +54,18 @@ async function shouldRefreshImages(): Promise<boolean> {
     const shouldRefresh = timeSinceLastFetch >= REFRESH_INTERVAL_MS;
 
     if (shouldRefresh) {
-      console.log(
-        `⏰ Refresh needed - last fetch was ${hoursAgo} hours ago (threshold: ${REFRESH_INTERVAL_HOURS} hours)`
+      background_logger.info(
+        `Refresh needed - last fetch was ${hoursAgo} hours ago (threshold: ${REFRESH_INTERVAL_HOURS} hours)`,
       );
     } else {
-      console.log(`✅ Images are fresh - last fetched ${hoursAgo} hours ago`);
+      background_logger.debug(
+        `Images are fresh - last fetched ${hoursAgo} hours ago`,
+      );
     }
 
     return shouldRefresh;
   } catch (error) {
-    console.error("❌ Error checking refresh status:", error);
+    background_logger.error("Error checking refresh status:", error);
     return true; // Default to refresh on error
   }
 }
@@ -116,154 +78,136 @@ async function shouldRefreshImages(): Promise<boolean> {
 async function refreshImages(): Promise<void> {
   // Prevent concurrent fetch operations
   if (backgroundState.isFetching) {
-    console.log("🔄 Fetch operation already in progress, skipping...");
+    background_logger.warn("Fetch operation already in progress, skipping...");
     return;
   }
 
   backgroundState.isFetching = true;
   const startTime = Date.now();
 
-  console.log("🚀 Starting enhanced image refresh...");
-  console.log("⬇️ Downloading images as blobs for offline support...");
-
   try {
-    // Step 1: Check cache settings and handle permanent cache mode
-    console.log("🔍 Checking cache settings...");
-    const settings = await new Promise<any>((resolve) => {
-      chrome.storage.local.get(['settings'], (result) => {
-        resolve(result.settings || {});
-      });
-    });
-
-    const permanentCacheEnabled = settings.cache?.permanentMode ?? false;
-    
-    if (permanentCacheEnabled) {
-      console.log("🔒 Permanent cache mode enabled - updating all images to permanent expiry...");
-      const updatedCount = await setAllImagesToPermanentCache();
-      console.log(`✅ Updated ${updatedCount} images to permanent cache expiry`);
-    }
-
-    // Step 2: Clean expired images (will only delete if expiry dates are in the past)
-    console.log("🧹 Cleaning expired images...");
-    const deletedCount = await cleanExpiredImages();
-    if (deletedCount > 0) {
-      console.log(`✅ Cleaned ${deletedCount} expired images`);
-    } else {
-      console.log("✅ No expired images to clean");
-    }
-
-    // Step 2: Get current database statistics for monitoring
-    const dbStats = await getDatabaseStats();
-    console.log(
-      `📊 Database stats - Total: ${dbStats.totalImages}, Valid: ${dbStats.validImages}, Expired: ${dbStats.expiredImages}`
-    );
-
-    // Step 3: Use enhanced fallback system for intelligent image selection
-    console.log(
-      "🤖 Using enhanced fallback system for optimal image selection..."
-    );
-    const strategy = await getImageSourceStrategy();
-    console.log(
-      `📋 Image source strategy: ${strategy.strategy} (reason: ${strategy.reason})`
-    );
-
-    let images: any[] = [];
-
-    if (strategy.strategy === "placeholder") {
-      console.log("🔌 Offline mode detected, generating placeholder...");
-      // This will be handled by the enhanced fallback system
-      images = await getImagesWithFallback(true); // Background refresh allows API calls
-    } else if (strategy.strategy === "fallback") {
-      console.log("🎨 Using fallback images (no API keys configured)...");
-      images = await getImagesWithFallback(true); // Background refresh allows API calls
-    } else {
-      // Strategy recommends API usage or cached images
-      console.log("🌐 Fetching from configured APIs with rate limiting...");
-
-      try {
-        images = await fetchAllImages();
-        console.log(
-          `📥 Successfully downloaded ${images.length} images from APIs`
-        );
-
-        // Track successful API usage
-        backgroundState.successfulFetches++;
-      } catch (apiError) {
-        console.warn(
-          "⚠️ API fetch failed, falling back to enhanced fallback system:",
-          apiError
-        );
-        backgroundState.failedFetches++;
-
-        // Use enhanced fallback system which handles rate limits and cache intelligently
-        images = await getImagesWithFallback(true); // Background refresh allows API calls
-        console.log(`🎯 Enhanced fallback provided ${images.length} images`);
-      }
-    }
-
-    // Step 4: Validate and store images
-    if (images.length > 0) {
-      console.log(`💾 Storing ${images.length} images in IndexedDB...`);
-      await storeImages(images);
-
-      // Update last fetch time and track successful refresh
-      const now = Date.now();
-      await setLastFetchTime(now);
-      backgroundState.lastRefresh = now;
-
-      const duration = now - startTime;
-      console.log(
-        `✅ Successfully cached ${images.length} images in ${duration}ms`
+    // Step 0: Check available storage space
+    background_logger.debug("Checking available storage space...");
+    try {
+      const storageInfo = await getStorageInfo();
+      const availableGB = (
+        storageInfo.available /
+        (1024 * 1024 * 1024)
+      ).toFixed(2);
+      background_logger.info(
+        `Storage - Available: ${availableGB}GB, Used: ${storageInfo.percentUsed.toFixed(1)}%`,
       );
 
-      // Log performance metrics
-      const validCount = await getValidImageCount();
-      console.log(`📈 Cache now contains ${validCount} valid images`);
-    } else {
-      console.warn("❌ No images were obtained from any source");
-      backgroundState.failedFetches++;
+      if (!storageInfo.hasEnoughSpace) {
+        background_logger.warn(
+          `Low storage space (${availableGB}GB available). Minimum ${MIN_STORAGE_THRESHOLD_GB}GB required.`,
+        );
+        background_logger.warn(
+          "Skipping image fetch to prevent storage issues.",
+        );
+        backgroundState.isFetching = false;
+        return;
+      }
+      background_logger.debug(
+        `Sufficient storage space available (${availableGB}GB)`,
+      );
+    } catch (storageError) {
+      background_logger.warn("Could not check storage space:", storageError);
+      background_logger.debug(
+        "Continuing with fetch (storage API not supported)...",
+      );
+    }
 
-      // Check if we have existing cache to fall back to
-      const existingImages = await getAllValidImages();
-      if (existingImages.length > 0) {
-        console.log(
-          `💡 Keeping ${existingImages.length} existing cached images`
-        );
+    // Step 1: Check cache settings and handle permanent cache mode
+    background_logger.debug(
+      "Checking cache settings if permanent cache mode is enabled...",
+    );
+    const settings = await getSettings();
+    const permanentCacheEnabled = settings.cache?.permanentMode;
+
+    if (!permanentCacheEnabled) {
+      background_logger.debug("Permanent cache mode not enabled");
+      background_logger.debug("Can perform cleaning of expired images...");
+      const deletedCount = await cleanExpiredImages();
+      if (deletedCount > 0) {
+        background_logger.info(`Cleaned ${deletedCount} expired images`);
       } else {
-        console.error(
-          "🚨 No images available - cache is empty and no fallback succeeded"
+        background_logger.debug("No expired images to clean");
+      }
+    } else {
+      background_logger.debug(
+        "Skipping image cleanup, permanent cache mode is on",
+      );
+    }
+
+    // Fetch images
+    background_logger.debug(
+      "Checking if api keys are available for images update",
+    );
+
+    const apisPresent = await areApiKeysConfigured(settings);
+
+    if (!apisPresent) {
+      background_logger.debug("No apis keys present, skipping image fetching");
+    } else {
+      background_logger.info("Fetching from configured APIs");
+
+      try {
+        const images = await fetchAllImages(settings);
+        if (images.length <= 0) {
+          background_logger.warn("Zero images downloaded");
+          backgroundState.failedFetches++;
+        } else {
+          background_logger.info(
+            `Successfully downloaded ${images.length} images from APIs`,
+          );
+          backgroundState.successfulFetches++;
+
+          background_logger.info(
+            `Storing ${images.length} images in IndexedDB...`,
+          );
+          await storeImages(images);
+          const now = Date.now();
+          await setLastFetchTime(now);
+          backgroundState.lastRefresh = now;
+
+          const duration = now - startTime;
+          background_logger.info(
+            `Successfully cached ${images.length} images in ${duration}ms`,
+          );
+        }
+      } catch (error) {
+        background_logger.warn(
+          "API fetch failed, falling back to enhanced fallback system:",
+          error,
         );
+        backgroundState.failedFetches++;
       }
     }
   } catch (error) {
-    console.error("💥 Critical error during image refresh:", error);
+    background_logger.error("Critical error during image refresh:", error);
     backgroundState.failedFetches++;
 
     // Emergency fallback: ensure we have at least some images
     try {
-      const existingImages = await getAllValidImages();
-      if (existingImages.length === 0) {
-        console.log("🆘 Emergency fallback: loading default images...");
-        const emergencyImages = await getFallbackImages();
-        if (emergencyImages.length > 0) {
-          await storeImages(emergencyImages);
-          await setLastFetchTime(Date.now());
-          console.log(
-            `🩹 Emergency fallback complete: ${emergencyImages.length} images cached`
-          );
-        }
+      const existingImages = await getValidImageCount();
+      if (existingImages <= 0) {
+        background_logger.info(
+          "Trying to download some default emergency images",
+        );
+        await getFallbackImages();
       }
     } catch (emergencyError) {
-      console.error("🔥 Emergency fallback failed:", emergencyError);
+      background_logger.error("Emergency fallback failed:", emergencyError);
     }
   } finally {
     backgroundState.isFetching = false;
     const totalDuration = Date.now() - startTime;
-    console.log(`⏱️ Image refresh completed in ${totalDuration}ms`);
+    background_logger.debug(`Image refresh completed in ${totalDuration}ms`);
 
     // Log operational statistics
-    console.log(
-      `📊 Session stats - Successful fetches: ${backgroundState.successfulFetches}, Failed: ${backgroundState.failedFetches}`
+    background_logger.info(
+      `Session stats - Successful fetches: ${backgroundState.successfulFetches}, Failed: ${backgroundState.failedFetches}`,
     );
   }
 }
@@ -278,18 +222,18 @@ function setupRefreshAlarm(): void {
     chrome.alarms.create(ALARM_NAME, {
       periodInMinutes: REFRESH_INTERVAL_HOURS * 60,
     });
-    console.log(
-      `⏰ Refresh alarm configured: every ${REFRESH_INTERVAL_HOURS} hours (${
+    background_logger.info(
+      `Refresh alarm configured: every ${REFRESH_INTERVAL_HOURS} hours (${
         REFRESH_INTERVAL_HOURS * 60
-      } minutes)`
+      } minutes)`,
     );
-    console.log(
-      `🎯 Next alarm will trigger at: ${new Date(
-        Date.now() + REFRESH_INTERVAL_HOURS * 60 * 60 * 1000
-      ).toLocaleString()}`
+    background_logger.debug(
+      `Next alarm will trigger at: ${new Date(
+        Date.now() + REFRESH_INTERVAL_HOURS * 60 * 60 * 1000,
+      ).toLocaleString()}`,
     );
   } catch (error) {
-    console.error("❌ Failed to setup refresh alarm:", error);
+    background_logger.error("Failed to setup refresh alarm:", error);
   }
 }
 
@@ -300,19 +244,21 @@ function setupRefreshAlarm(): void {
  */
 function handleAlarmEvent(alarm: chrome.alarms.Alarm): void {
   if (alarm.name === ALARM_NAME) {
-    console.log("⏰ Scheduled alarm triggered - initiating image refresh");
-    console.log(`📅 Alarm fired at: ${new Date().toLocaleString()}`);
+    background_logger.info(
+      "Scheduled alarm triggered - initiating image refresh",
+    );
+    background_logger.debug(`Alarm fired at: ${new Date().toLocaleString()}`);
 
     refreshImages()
       .then(() => {
-        console.log("✅ Scheduled refresh completed successfully");
+        background_logger.info("Scheduled refresh completed successfully");
       })
       .catch((error) => {
-        console.error("❌ Scheduled refresh failed:", error);
+        background_logger.error("Scheduled refresh failed:", error);
         backgroundState.failedFetches++;
       });
   } else {
-    console.warn(`⚠️ Unknown alarm received: ${alarm.name}`);
+    background_logger.warn(`Unknown alarm received: ${alarm.name}`);
   }
 }
 
@@ -326,41 +272,40 @@ chrome.alarms.onAlarm.addListener(handleAlarmEvent);
  * @param details - Chrome runtime installation details
  */
 async function handleExtensionInstall(
-  details: chrome.runtime.InstalledDetails
+  details: chrome.runtime.InstalledDetails,
 ): Promise<void> {
-  console.log("🚀 Extension installed/updated:", details.reason);
-  console.log(`📦 Extension version: ${chrome.runtime.getManifest().version}`);
+  background_logger.info("Extension installed/updated:", details.reason);
 
   try {
     // Initialize database with error handling
-    console.log("🗄️ Initializing IndexedDB database...");
+    background_logger.debug("Initializing IndexedDB database...");
     await initDB();
-    console.log("✅ Database initialized successfully");
+    background_logger.info("Database initialized successfully");
 
     // Set up alarm system
-    console.log("⏰ Setting up refresh alarm...");
+    background_logger.debug("Setting up refresh alarm...");
     setupRefreshAlarm();
 
     // Check if initial fetch is needed
     const needsRefresh = await shouldRefreshImages();
     if (needsRefresh) {
-      console.log("🔄 Performing initial image fetch...");
+      background_logger.info("Performing initial image fetch...");
       await refreshImages();
     } else {
       const lastFetch = await getLastFetchTime();
       if (lastFetch) {
         const hoursAgo = Math.round(
-          (Date.now() - lastFetch) / (1000 * 60 * 60)
+          (Date.now() - lastFetch) / (1000 * 60 * 60),
         );
-        console.log(
-          `✅ Images are already fresh (fetched ${hoursAgo} hours ago)`
+        background_logger.info(
+          `Images are already fresh (fetched ${hoursAgo} hours ago)`,
         );
       }
     }
 
-    console.log("🎉 Extension initialization completed successfully");
+    background_logger.info("Extension initialization completed successfully");
   } catch (error) {
-    console.error("💥 Extension initialization failed:", error);
+    background_logger.error("Extension initialization failed:", error);
     backgroundState.failedFetches++;
   }
 }
@@ -372,7 +317,7 @@ chrome.runtime.onInstalled.addListener(handleExtensionInstall);
  * Check on startup (service worker wake)
  */
 chrome.runtime.onStartup.addListener(async () => {
-  console.log("Service worker started");
+  background_logger.info("Service worker started");
 
   // Initialize database
   await initDB();
@@ -380,19 +325,23 @@ chrome.runtime.onStartup.addListener(async () => {
   // Ensure alarm is set
   const alarm = await chrome.alarms.get(ALARM_NAME);
   if (!alarm) {
-    console.log("Alarm not found, recreating...");
+    background_logger.warn("Alarm not found, recreating...");
     setupRefreshAlarm();
   }
 
   // Check if we need to refresh
   if (await shouldRefreshImages()) {
-    console.log("Time to refresh images (last fetch was over 6 hours ago)");
+    background_logger.info(
+      "Time to refresh images (last fetch was over 6 hours ago)",
+    );
     await refreshImages();
   } else {
     const lastFetch = await getLastFetchTime();
     if (lastFetch) {
       const hoursAgo = Math.floor((Date.now() - lastFetch) / (1000 * 60 * 60));
-      console.log(`Images are fresh (last fetched ${hoursAgo} hours ago)`);
+      background_logger.info(
+        `Images are fresh (last fetched ${hoursAgo} hours ago)`,
+      );
     }
   }
 });
@@ -402,62 +351,64 @@ chrome.runtime.onStartup.addListener(async () => {
  * Handles various action types including refresh requests, status checks, and API key updates
  * Provides detailed logging and response feedback for debugging and monitoring
  * @param message - Message object containing action and optional payload
- * @param sender - Information about the message sender (unused but kept for compatibility)
+ * @param sender - Information about the message sender
  * @param sendResponse - Function to send response back to sender
  * @returns boolean indicating whether response will be sent asynchronously
  */
 chrome.runtime.onMessage.addListener(
   (
     message: { action: string },
-    _sender: chrome.runtime.MessageSender,
-    sendResponse: (response: any) => void
+    sender: chrome.runtime.MessageSender,
+    sendResponse: (response: any) => void,
   ): boolean => {
-    console.log(
-      "📨 Received message:",
+    background_logger.debug(
+      "Received message:",
       message,
       "from sender:",
-      _sender.tab?.url || "extension"
+      sender.tab?.url || "extension",
     );
     backgroundState.messageCount++;
 
     try {
       // Handle force refresh request
       if (message.action === "forceRefresh") {
-        console.log("🔄 Force refresh requested");
+        background_logger.info("Force refresh requested");
         backgroundState.manualRefreshCount++;
 
-        refreshImages()
-          .then(() => {
-            console.log("✅ Force refresh completed successfully");
+        (async () => {
+          try {
+            await refreshImages();
+            background_logger.info("Force refresh completed successfully");
             sendResponse({
               success: true,
               message: "Images force refreshed successfully",
             });
-          })
-          .catch((error) => {
-            console.error("❌ Force refresh failed:", error);
+          } catch (error: any) {
+            background_logger.error("Force refresh failed:", error);
             backgroundState.failedFetches++;
             sendResponse({
               success: false,
               error: error.message || "Failed to force refresh images",
             });
-          });
+          }
+        })();
         return true; // Keep channel open for async response
       }
 
       // Handle refresh status check
       if (message.action === "checkRefreshStatus") {
-        console.log("📊 Refresh status check requested");
+        background_logger.debug("Refresh status check requested");
 
-        getLastFetchTime()
-          .then((lastFetch) => {
+        (async () => {
+          try {
+            const lastFetch = await getLastFetchTime();
             const hoursAgo = lastFetch
               ? Math.floor((Date.now() - lastFetch) / (1000 * 60 * 60))
               : null;
-            console.log(
-              `📅 Last fetch: ${
+            background_logger.debug(
+              `Last fetch: ${
                 lastFetch ? new Date(lastFetch).toLocaleString() : "never"
-              }`
+              }`,
             );
 
             sendResponse({
@@ -468,67 +419,70 @@ chrome.runtime.onMessage.addListener(
                 ? new Date(lastFetch).toLocaleString()
                 : "Never",
             });
-          })
-          .catch((error) => {
-            console.error("❌ Failed to check refresh status:", error);
+          } catch (error: any) {
+            background_logger.error("Failed to check refresh status:", error);
             sendResponse({ success: false, error: error.message });
-          });
+          }
+        })();
         return true; // Keep channel open for async response
       }
 
       // Handle refresh needed check with opportunistic refresh
       if (message.action === "checkRefreshNeeded") {
-        console.log(
-          "🔍 Checking if refresh is needed (triggered from page)..."
+        background_logger.debug(
+          "Checking if refresh is needed (triggered from page)...",
         );
 
-        shouldRefreshImages()
-          .then((needsRefresh) => {
+        (async () => {
+          try {
+            const needsRefresh = await shouldRefreshImages();
             if (needsRefresh) {
-              console.log(
-                "⚠️ Refresh is overdue! Triggering opportunistic refresh..."
+              background_logger.info(
+                "Refresh is overdue! Triggering opportunistic refresh...",
               );
               backgroundState.opportunisticRefreshCount++;
 
-              refreshImages()
-                .then(() => {
-                  console.log(
-                    "✅ Opportunistic refresh completed successfully"
-                  );
-                  sendResponse({
-                    success: true,
-                    refreshed: true,
-                    message: "Cache was stale, refreshed automatically",
-                  });
-                })
-                .catch((error) => {
-                  console.error("❌ Opportunistic refresh failed:", error);
-                  backgroundState.failedFetches++;
-                  sendResponse({
-                    success: false,
-                    refreshed: false,
-                    error: error.message || "Opportunistic refresh failed",
-                  });
+              try {
+                await refreshImages();
+                background_logger.info(
+                  "Opportunistic refresh completed successfully",
+                );
+                sendResponse({
+                  success: true,
+                  triggered: true,
+                  message: "Cache was stale, refreshed automatically",
                 });
+              } catch (error: any) {
+                background_logger.error(
+                  "Opportunistic refresh failed:",
+                  error,
+                );
+                backgroundState.failedFetches++;
+                sendResponse({
+                  success: false,
+                  triggered: false,
+                  error: error.message || "Opportunistic refresh failed",
+                });
+              }
             } else {
-              console.log("✅ Cache is fresh, no refresh needed");
+              background_logger.debug("Cache is fresh, no refresh needed");
               sendResponse({
                 success: true,
-                refreshed: false,
+                triggered: false,
                 message: "Cache is fresh",
               });
             }
-          })
-          .catch((error) => {
-            console.error("❌ Failed to check refresh status:", error);
+          } catch (error: any) {
+            background_logger.error("Failed to check refresh status:", error);
             sendResponse({ success: false, error: error.message });
-          });
+          }
+        })();
         return true; // Keep channel open for async response
       }
 
       // Handle settings update notification
       if (message.action === "settingsUpdated") {
-        console.log("⚙️ Settings updated, will apply on next refresh");
+        background_logger.info("Settings updated, will apply on next refresh");
         backgroundState.settingsUpdateCount++;
         sendResponse({
           success: true,
@@ -539,7 +493,7 @@ chrome.runtime.onMessage.addListener(
 
       // Handle API key update notification with cooldown protection
       if (message.action === "apiKeysUpdated") {
-        console.log("🔑 API keys updated, checking cooldown...");
+        background_logger.info("API keys updated, checking cooldown...");
 
         const now = Date.now();
         const timeSinceLastManualFetch = now - backgroundState.lastManualFetch;
@@ -547,9 +501,11 @@ chrome.runtime.onMessage.addListener(
         // Prevent spam: 10-second cooldown for API-triggered fetches
         if (timeSinceLastManualFetch < IMMEDIATE_FETCH_COOLDOWN_MS) {
           const remainingCooldown = Math.ceil(
-            (IMMEDIATE_FETCH_COOLDOWN_MS - timeSinceLastManualFetch) / 1000
+            (IMMEDIATE_FETCH_COOLDOWN_MS - timeSinceLastManualFetch) / 1000,
           );
-          console.log(`⏳ Cooldown active. Please wait ${remainingCooldown}s`);
+          background_logger.warn(
+            `Cooldown active. Please wait ${remainingCooldown}s`,
+          );
           sendResponse({
             success: false,
             error: `Please wait ${remainingCooldown} seconds before fetching again`,
@@ -560,31 +516,36 @@ chrome.runtime.onMessage.addListener(
 
         backgroundState.lastManualFetch = now;
         backgroundState.apiKeyUpdateCount++;
-        console.log("🚀 Fetching images immediately after API key update...");
+        background_logger.info(
+          "Fetching images immediately after API key update...",
+        );
 
-        refreshImages()
-          .then(() => {
-            console.log("✅ API key triggered refresh completed successfully");
+        (async () => {
+          try {
+            await refreshImages();
+            background_logger.info(
+              "API key triggered refresh completed successfully",
+            );
             sendResponse({
               success: true,
               message: "Images refreshed successfully with new API keys",
             });
-          })
-          .catch((error) => {
-            console.error("❌ API key triggered refresh failed:", error);
+          } catch (error: any) {
+            background_logger.error("API key triggered refresh failed:", error);
             backgroundState.failedFetches++;
             sendResponse({
               success: false,
               error:
                 error.message || "Failed to refresh images with new API keys",
             });
-          });
+          }
+        })();
         return true; // Keep channel open for async response
       }
 
       // Handle requests for background statistics
       if (message.action === "getBackgroundStats") {
-        console.log("📊 Background statistics requested");
+        background_logger.debug("Background statistics requested");
         const uptime = Date.now() - backgroundState.startTime;
         const stats = {
           ...backgroundState,
@@ -599,30 +560,33 @@ chrome.runtime.onMessage.addListener(
 
       // Handle force refresh cache requests (ignores permanent cache setting)
       if (message.action === "forceRefreshCache") {
-        console.log("🔄 Force refresh cache requested");
-        
+        background_logger.info("Force refresh cache requested");
+
         // Force refresh ignores permanent cache setting and always fetches new images
-        refreshImages()
-          .then(() => {
+        // Use async IIFE to properly handle the response
+        (async () => {
+          try {
+            await refreshImages();
+            background_logger.info("Force refresh completed successfully");
             sendResponse({ success: true });
-          })
-          .catch((error) => {
-            console.error("❌ Force refresh failed:", error);
+          } catch (error) {
+            background_logger.error("Force refresh failed:", error);
             sendResponse({ success: false, error: "Failed to refresh cache" });
-          });
-        
-        return true; // Async response
+          }
+        })();
+
+        return true; // Keep message channel open for async response
       }
 
       // Handle unknown message actions
-      console.warn("⚠️ Unknown message action:", message.action);
+      background_logger.warn("Unknown message action:", message.action);
       sendResponse({
         success: false,
         error: `Unknown action: ${message.action}`,
       });
       return false;
     } catch (error) {
-      console.error("💥 Message handler error:", error);
+      background_logger.error("Message handler error:", error);
       backgroundState.failedFetches++;
       sendResponse({
         success: false,
@@ -630,7 +594,7 @@ chrome.runtime.onMessage.addListener(
       });
       return false;
     }
-  }
+  },
 );
 
 /**
@@ -651,9 +615,13 @@ function formatDuration(ms: number): string {
 }
 
 // Log successful background service worker initialization
-console.log("🚀 Background service worker loaded and ready");
-console.log(`📦 Extension version: ${chrome.runtime.getManifest().version}`);
-console.log(`⏰ Service worker started at: ${new Date().toLocaleString()}`);
-console.log(
-  "🎯 Event listeners registered for alarms, installation, and messages"
+background_logger.info("Background service worker loaded and ready");
+background_logger.info(
+  `Extension version: ${chrome.runtime.getManifest().version}`,
+);
+background_logger.info(
+  `Service worker started at: ${new Date().toLocaleString()}`,
+);
+background_logger.debug(
+  "Event listeners registered for alarms, installation, and messages",
 );

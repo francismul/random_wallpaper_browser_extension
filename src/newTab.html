@@ -1,218 +1,148 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>New Tab</title>
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    body {
-      width: 100vw;
-      height: 100vh;
-      overflow: hidden;
-      font-family: 'Courier New', Courier, monospace;
-      background-color: #121212;
-      color: #e0e0e0;
-    }
-
-    #wallpaper {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      z-index: -1;
-      opacity: 0;
-      transform: scale(1);
-      transition: opacity 0.6s ease-in-out, transform 0.6s ease-in-out;
-    }
-
-    #wallpaper.loaded {
-      opacity: 1;
-      transform: scale(1);
-    }
-
-    /* Fade animation (default) */
-    #wallpaper.fade-out {
-      opacity: 0;
-    }
-
-    /* Slide animation */
-    #wallpaper.slide-next {
-      animation: slideInFromRight 0.6s ease-in-out;
-    }
-
-    #wallpaper.slide-prev {
-      animation: slideInFromLeft 0.6s ease-in-out;
-    }
-
-    @keyframes slideInFromRight {
-      from {
-        transform: translateX(100%);
-        opacity: 0;
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>New Tab</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
       }
-      to {
-        transform: translateX(0);
-        opacity: 1;
+
+      html{
+        color-scheme: dark;
       }
-    }
 
-    @keyframes slideInFromLeft {
-      from {
-        transform: translateX(-100%);
-        opacity: 0;
+      body {
+        width: 100vw;
+        height: 100vh;
+        overflow: hidden;
+        font-family: "Courier New", Courier, monospace;
+        background-color: #121212;
+        color: #e0e0e0;
       }
-      to {
-        transform: translateX(0);
-        opacity: 1;
+
+      #wallpaperCanvas {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: -1;
+        display: block;
       }
-    }
 
-    /* Zoom animation */
-    #wallpaper.zoom-in {
-      animation: zoomIn 0.6s ease-in-out;
-    }
-
-    @keyframes zoomIn {
-      from {
-        transform: scale(1.2);
-        opacity: 0;
+      /* Bento Grid Layout & Retro Styling */
+      .bento-container {
+        position: fixed;
+        bottom: 30px;
+        left: 30px;
+        right: 30px;
+        top: 30px;
+        pointer-events: none;
+        display: grid;
+        grid-template-columns: 250px 1fr 250px;
+        grid-template-rows: 1fr auto;
+        gap: 20px;
       }
-      to {
-        transform: scale(1);
-        opacity: 1;
+
+      .bento-card {
+        background: rgba(18, 18, 18, 0.85); /* Dark background */
+        backdrop-filter: blur(10px);
+        border: 2px solid #333;
+        border-radius: 16px;
+        padding: 20px;
+        box-shadow: 4px 4px 0px rgba(0, 0, 0, 0.5); /* Retro hard shadow */
+        pointer-events: auto;
+        transition:
+          transform 0.2s ease,
+          box-shadow 0.2s ease;
       }
-    }
 
-    /* Fade and zoom combo */
-    #wallpaper.fade-zoom {
-      animation: fadeZoom 0.7s ease-in-out;
-    }
-
-    @keyframes fadeZoom {
-      from {
-        transform: scale(0.95);
-        opacity: 0;
+      .bento-card:hover {
+        transform: translate(-2px, -2px);
+        box-shadow: 6px 6px 0px rgba(0, 0, 0, 0.5);
+        border-color: #667eea;
       }
-      to {
-        transform: scale(1);
-        opacity: 1;
+
+      .controls {
+        /* Replaced by Bento positioning */
+        display: flex;
+        gap: 15px;
+        justify-content: flex-end;
       }
-    }
 
-    /* Bento Grid Layout & Retro Styling */
-    .bento-container {
-      position: fixed;
-      bottom: 30px;
-      left: 30px;
-      right: 30px;
-      top: 30px;
-      pointer-events: none;
-      display: grid;
-      grid-template-columns: 250px 1fr 250px;
-      grid-template-rows: 1fr auto;
-      gap: 20px;
-    }
+      .clock-area {
+        grid-column: 2;
+        grid-row: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        /* Transparent background for the clock to show wallpaper */
+        background: transparent;
+        backdrop-filter: none;
+        border: none;
+        box-shadow: none;
+        pointer-events: none;
+      }
 
-    .bento-card {
-      background: rgba(18, 18, 18, 0.85); /* Dark background */
-      backdrop-filter: blur(10px);
-      border: 2px solid #333;
-      border-radius: 16px;
-      padding: 20px;
-      box-shadow: 4px 4px 0px rgba(0, 0, 0, 0.5); /* Retro hard shadow */
-      pointer-events: auto;
-      transition: transform 0.2s ease, box-shadow 0.2s ease;
-    }
+      .clock-content {
+        /* Inner card for clock if we want a backplate, or just text */
+        text-align: center;
+      }
 
-    .bento-card:hover {
-      transform: translate(-2px, -2px);
-      box-shadow: 6px 6px 0px rgba(0, 0, 0, 0.5);
-      border-color: #667eea;
-    }
+      .bottom-bar {
+        grid-column: 1 / -1;
+        grid-row: 2;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        pointer-events: none;
+      }
 
-    .controls {
-      /* Replaced by Bento positioning */
-      display: flex;
-      gap: 15px;
-      justify-content: flex-end;
-    }
+      .credit-section {
+        pointer-events: auto;
+      }
 
-    .clock-area {
-      grid-column: 2;
-      grid-row: 1;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      /* Transparent background for the clock to show wallpaper */
-      background: transparent; 
-      backdrop-filter: none;
-      border: none;
-      box-shadow: none;
-      pointer-events: none;
-    }
-    
-    .clock-content {
-      /* Inner card for clock if we want a backplate, or just text */
-      text-align: center;
-    }
+      .controls-section {
+        pointer-events: auto;
+      }
 
-    .bottom-bar {
-      grid-column: 1 / -1;
-      grid-row: 2;
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-end;
-      pointer-events: none;
-    }
-    
-    .credit-section {
-      pointer-events: auto;
-    }
-    
-    .controls-section {
-      pointer-events: auto;
-    }
+      button {
+        background: #2d2d2d;
+        color: #00ff9d; /* Retro Green */
+        border: 2px solid #00ff9d;
+        padding: 12px 24px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-family: "Courier New", Courier, monospace;
+        font-size: 14px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        box-shadow: 3px 3px 0px #005f3b;
+      }
 
-    button {
-      background: #2d2d2d;
-      color: #00ff9d; /* Retro Green */
-      border: 2px solid #00ff9d;
-      padding: 12px 24px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-family: 'Courier New', Courier, monospace;
-      font-size: 14px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      transition: all 0.2s ease;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      box-shadow: 3px 3px 0px #005f3b; 
-    }
+      button:hover {
+        background: #00ff9d;
+        color: #121212;
+        transform: translate(-2px, -2px);
+        box-shadow: 5px 5px 0px #005f3b;
+      }
 
-    button:hover {
-      background: #00ff9d;
-      color: #121212;
-      transform: translate(-2px, -2px);
-      box-shadow: 5px 5px 0px #005f3b;
-    }
+      button:active {
+        transform: translate(0, 0);
+        box-shadow: 0px 0px 0px #005f3b;
+      }
 
-    button:active {
-      transform: translate(0, 0);
-      box-shadow: 0px 0px 0px #005f3b;
-    }
-
-    .credit {
+      .credit {
         /* Re-styling credit to match Bento/Retro */
         position: relative;
         bottom: auto;
@@ -222,243 +152,531 @@
         color: #ddd;
         padding: 12px 20px;
         border-radius: 12px;
-        font-family: 'Courier New', Courier, monospace;
+        font-family: "Courier New", Courier, monospace;
         box-shadow: 4px 4px 0px #000;
         display: inline-block;
         pointer-events: auto;
-    }
-    
-    .credit a {
-      color: #ff00de; /* Neon Pink */
-      text-decoration: none;
-      font-weight: bold;
-    }
-
-    .credit a:hover {
-      text-decoration: underline;
-    }
-
-    /* Clock Styles */
-    .clock-container {
-      /* Resetting fixed positioning for grid placement */
-      position: static;
-      top: auto;
-      left: auto;
-      transform: none;
-      text-align: center;
-      color: white;
-      text-shadow: 3px 3px 0px rgba(0,0,0,0.8);
-      z-index: 10;
-    }
-
-    .time {
-      font-size: 120px;
-      font-weight: 700;
-      letter-spacing: -5px;
-      line-height: 1;
-      margin-bottom: 0px;
-      font-family: 'Courier New', Courier, monospace;
-      color: #fff;
-    }
-
-    .date {
-      font-size: 24px;
-      font-weight: 700;
-      opacity: 1;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      color: #00ff9d; /* Retro Green details */
-      background: #000;
-      display: inline-block;
-      padding: 5px 15px;
-      transform: rotate(-2deg); /* Slightly jaunty angle */
-      box-shadow: 3px 3px 0px #fff;
-    }
-
-    @media (max-width: 768px) {
-      .bento-container {
-        grid-template-columns: 1fr;
-        grid-template-rows: 1fr auto auto;
-        gap: 10px;
-        padding: 10px;
-        bottom: 10px;
-        top: 10px;
-        left: 10px;
-        right: 10px;
       }
-      
-      .clock-area {
-        grid-column: 1;
-        grid-row: 1;
+
+      .credit a {
+        color: #ff00de; /* Neon Pink */
+        text-decoration: none;
+        font-weight: bold;
       }
-      
-      .bottom-bar {
-         display: contents; /* Ungroup allow children to flow in grid */
+
+      .credit a:hover {
+        text-decoration: underline;
       }
-      
-      .credit-section {
-         grid-row: 3;
-         text-align: center;
-      }
-      
-      .controls-section {
-        grid-row: 2;
-        justify-content: center;
-        display: flex;
+
+      /* Clock Styles */
+      .clock-container {
+        /* Resetting fixed positioning for grid placement */
+        position: static;
+        top: auto;
+        left: auto;
+        transform: none;
+        text-align: center;
+        color: white;
+        text-shadow: 3px 3px 0px rgba(0, 0, 0, 0.8);
+        z-index: 10;
+        /* Hide by default to prevent flash, will be shown by JS if enabled */
+        display: none;
       }
 
       .time {
-        font-size: 64px;
+        font-size: 120px;
+        font-weight: 700;
+        letter-spacing: -5px;
+        line-height: 1;
+        margin-bottom: 0px;
+        font-family: "Courier New", Courier, monospace;
+        color: #fff;
       }
+
       .date {
+        font-size: 24px;
+        font-weight: 700;
+        opacity: 1;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        color: #00ff9d; /* Retro Green details */
+        background: #000;
+        display: inline-block;
+        padding: 5px 15px;
+        transform: rotate(-2deg); /* Slightly jaunty angle */
+        box-shadow: 3px 3px 0px #fff;
+      }
+
+      @media (max-width: 768px) {
+        .bento-container {
+          grid-template-columns: 1fr;
+          grid-template-rows: 1fr auto auto;
+          gap: 10px;
+          padding: 10px;
+          bottom: 10px;
+          top: 10px;
+          left: 10px;
+          right: 10px;
+        }
+
+        .clock-area {
+          grid-column: 1;
+          grid-row: 1;
+        }
+
+        .bottom-bar {
+          display: contents; /* Ungroup allow children to flow in grid */
+        }
+
+        .credit-section {
+          grid-row: 3;
+          text-align: center;
+        }
+
+        .controls-section {
+          grid-row: 2;
+          justify-content: center;
+          display: flex;
+        }
+
+        .time {
+          font-size: 64px;
+        }
+        .date {
+          font-size: 16px;
+        }
+      }
+
+      /* History Navigation Arrows */
+      .nav-arrow {
+        position: fixed;
+        top: 50%;
+        transform: translateY(-50%);
+        z-index: 1000;
+
+        /* Keep arrows but retro style them */
+        background: #2d2d2d;
+        border: 2px solid #fff;
+        color: #00ff9d;
+        border-radius: 0; /* Square/Sharp */
+        box-shadow: 4px 4px 0px #000;
+        width: 60px;
+        height: 80px;
+        font-size: 48px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .nav-arrow-left {
+        left: 30px;
+      }
+
+      .nav-arrow-right {
+        right: 30px;
+      }
+
+      .nav-arrow:hover {
+        background: #00ff9d;
+        color: #000;
+        border-color: #000;
+        transform: translateY(-50%) translate(-2px, -2px);
+        box-shadow: 6px 6px 0px #000;
+      }
+
+      .nav-arrow:active {
+        transform: translateY(-50%) scale(0.95);
+      }
+
+      .nav-arrow.disabled {
+        opacity: 0.3;
+        cursor: not-allowed;
+      }
+
+      .nav-arrow.disabled:hover {
+        transform: translateY(-50%) scale(1);
+      }
+
+      /* History Indicator */
+      .history-indicator {
+        position: fixed;
+        bottom: 100px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0, 0, 0, 0.6);
+        backdrop-filter: blur(10px);
+        color: white;
+        padding: 8px 20px;
+        border-radius: 20px;
+        font-size: 14px;
+        font-weight: 500;
+        z-index: 1000;
+        display: none;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        white-space: nowrap;
+      }
+
+      .history-indicator.visible {
+        display: block;
+      }
+
+      /* Custom Context Menu */
+      .context-menu {
+        position: fixed;
+        background: rgba(18, 18, 18, 0.95);
+        backdrop-filter: blur(10px);
+        border: 2px solid #00ff9d;
+        border-radius: 12px;
+        padding: 8px;
+        z-index: 10000;
+        min-width: 220px;
+        box-shadow: 6px 6px 0px rgba(0, 0, 0, 0.5);
+        display: none;
+        font-family: "Courier New", Courier, monospace;
+      }
+
+      .context-menu.visible {
+        display: block;
+        animation: contextMenuAppear 0.2s ease;
+      }
+
+      @keyframes contextMenuAppear {
+        from {
+          opacity: 0;
+          transform: scale(0.95);
+        }
+        to {
+          opacity: 1;
+          transform: scale(1);
+        }
+      }
+
+      .context-menu ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+
+      .context-menu li {
+        padding: 12px 16px;
+        cursor: pointer;
+        color: #e0e0e0;
+        font-size: 14px;
+        font-weight: 600;
+        transition: all 0.2s ease;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .context-menu li:hover {
+        background: #00ff9d;
+        color: #121212;
+        transform: translateX(4px);
+      }
+
+      .context-menu li svg {
+        width: 18px;
+        height: 18px;
+        stroke: currentColor;
+      }
+
+      .context-menu-divider {
+        height: 1px;
+        background: #333;
+        margin: 8px 0;
+      }
+
+      /* UI visibility toggle */
+      .ui-hidden .bento-container,
+      .ui-hidden .nav-arrow,
+      .ui-hidden .history-indicator {
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s ease;
+      }
+
+      body:not(.ui-hidden) .bento-container,
+      body:not(.ui-hidden) .nav-arrow,
+      body:not(.ui-hidden) .history-indicator {
+        opacity: 1;
+        transition: opacity 0.3s ease;
+      }
+
+      /* History Modal */
+      .history-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        backdrop-filter: blur(5px);
+        z-index: 9999;
+        display: none;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .history-modal.visible {
+        display: flex;
+      }
+
+      .history-modal-content {
+        background: rgba(18, 18, 18, 0.95);
+        border: 2px solid #00ff9d;
+        border-radius: 16px;
+        padding: 30px;
+        max-width: 600px;
+        width: 90%;
+        max-height: 80vh;
+        overflow-y: auto;
+        box-shadow: 8px 8px 0px rgba(0, 0, 0, 0.5);
+      }
+
+      .history-modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+      }
+
+      .history-modal-header h2 {
+        color: #00ff9d;
+        font-size: 24px;
+        margin: 0;
+      }
+
+      .history-modal-close {
+        background: #2d2d2d;
+        color: #00ff9d;
+        border: 2px solid #00ff9d;
+        padding: 8px 16px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-family: "Courier New", Courier, monospace;
+        font-size: 14px;
+        font-weight: 700;
+        transition: all 0.2s ease;
+      }
+
+      .history-modal-close:hover {
+        background: #00ff9d;
+        color: #121212;
+      }
+
+      .history-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .history-item {
+        background: rgba(45, 45, 45, 0.8);
+        border: 2px solid #333;
+        border-radius: 8px;
+        padding: 15px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .history-item:hover {
+        border-color: #00ff9d;
+        transform: translateX(5px);
+      }
+
+      .history-item.current {
+        border-color: #00ff9d;
+        background: rgba(0, 255, 157, 0.1);
+      }
+
+      .history-item-info {
+        flex: 1;
+      }
+
+      .history-item-source {
+        color: #00ff9d;
+        font-weight: 600;
+        font-size: 14px;
+      }
+
+      .history-item-time {
+        color: #999;
+        font-size: 12px;
+        margin-top: 5px;
+      }
+
+      .history-empty {
+        text-align: center;
+        color: #999;
+        padding: 40px 20px;
         font-size: 16px;
       }
-    }
 
-    /* History Navigation Arrows */
-    .nav-arrow {
-      position: fixed;
-      top: 50%;
-      transform: translateY(-50%);
-      z-index: 1000;
-      
-      /* Keep arrows but retro style them */
-      background: #2d2d2d;
-      border: 2px solid #fff;
-      color: #00ff9d;
-      border-radius: 0; /* Square/Sharp */
-      box-shadow: 4px 4px 0px #000;
-      width: 60px;
-      height: 80px;
-      font-size: 48px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      transition: all 0.2s ease;
-    }
-    
-    .nav-arrow-left {
-      left: 30px;
-    }
-    
-    .nav-arrow-right {
-      right: 30px;
-    }
-
-    .nav-arrow:hover {
-      background: #00ff9d;
-      color: #000;
-      border-color: #000;
-      transform: translateY(-50%) translate(-2px, -2px);
-      box-shadow: 6px 6px 0px #000;
-    }
-
-    .nav-arrow:active {
-      transform: translateY(-50%) scale(0.95);
-    }
-
-    .nav-arrow.disabled {
-      opacity: 0.3;
-      cursor: not-allowed;
-    }
-
-    .nav-arrow.disabled:hover {
-      transform: translateY(-50%) scale(1);
-    }
-
-    /* History Indicator */
-    .history-indicator {
-      position: fixed;
-      bottom: 100px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(0, 0, 0, 0.6);
-      backdrop-filter: blur(10px);
-      color: white;
-      padding: 8px 20px;
-      border-radius: 20px;
-      font-size: 14px;
-      font-weight: 500;
-      z-index: 1000;
-      display: none;
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      white-space: nowrap;
-    }
-
-    .history-indicator.visible {
-      display: block;
-    }
-
-    @media (max-width: 768px) {
-      .nav-arrow {
-        width: 50px;
-        height: 70px;
-        font-size: 36px;
+      @media (max-width: 768px) {
+        .nav-arrow {
+          width: 50px;
+          height: 70px;
+          font-size: 36px;
+        }
+        .nav-arrow-left {
+          left: 20px;
+        }
+        .nav-arrow-right {
+          right: 20px;
+        }
+        .history-indicator {
+          bottom: 80px;
+          font-size: 12px;
+          padding: 6px 16px;
+        }
       }
-      .nav-arrow-left {
-        left: 20px;
-      }
-      .nav-arrow-right {
-        right: 20px;
-      }
-      .history-indicator {
-        bottom: 80px;
-        font-size: 12px;
-        padding: 6px 16px;
-      }
-    }
-  </style>
-</head>
-<body>
-  <img id="wallpaper" alt="Wallpaper">
-  
-  <div class="loading" id="loading" style="display: none !important;">Loading...</div>
-  
-  <!-- History Navigation Arrows -->
-  <button class="nav-arrow nav-arrow-left" id="prevImageBtn" title="Previous image (← Left arrow key)">
-    ‹
-  </button>
-  
-  <button class="nav-arrow nav-arrow-right" id="nextImageBtn" title="New random image (→ Right arrow key)">
-    ›
-  </button>
-  
-  <!-- History Position Indicator -->
-  <div class="history-indicator" id="historyIndicator">
-    <span id="historyPosition">1</span> / <span id="historyTotal">15</span>
-  </div>
-  
-  <div class="bento-container">
-    <div class="clock-area">
-      <!-- Clock Container -->
-      <div class="clock-container" id="clockContainer">
-        <div class="time" id="timeDisplay">00:00:00</div>
-        <div class="date" id="dateDisplay">Loading...</div>
-      </div>
+    </style>
+  </head>
+  <body>
+    <canvas id="wallpaperCanvas"></canvas>
+
+    <div class="loading" id="loading" style="display: none !important">
+      Loading...
     </div>
 
-    <div class="bottom-bar">
-      <div class="credit-section">
-        <div class="credit" id="credit">
-          Photo by <span id="author"></span> on <span id="source"></span>
+    <!-- History Navigation Arrows -->
+    <button
+      class="nav-arrow nav-arrow-left"
+      id="prevImageBtn"
+      title="Previous image (← Left arrow key)"
+    >
+      ‹
+    </button>
+
+    <button
+      class="nav-arrow nav-arrow-right"
+      id="nextImageBtn"
+      title="New random image (→ Right arrow key)"
+    >
+      ›
+    </button>
+
+    <!-- History Position Indicator -->
+    <div class="history-indicator" id="historyIndicator">
+      <span id="historyPosition">1</span> / <span id="historyTotal">15</span>
+    </div>
+
+    <div class="bento-container">
+      <div class="clock-area">
+        <!-- Clock Container -->
+        <div class="clock-container" id="clockContainer">
+          <div class="time" id="timeDisplay">00:00:00</div>
+          <div class="date" id="dateDisplay">Loading...</div>
         </div>
       </div>
 
-      <div class="controls-section">
-        <div class="controls">
-          <button id="settingsBtn" title="Open settings">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/>
-              <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/>
-            </svg>
-            Settings
-          </button>
+      <div class="bottom-bar">
+        <div class="credit-section">
+          <div class="credit" id="credit">
+            Photo by <span id="author"></span> on <span id="source"></span>
+          </div>
+        </div>
+
+        <div class="controls-section">
+          <div class="controls">
+            <button id="randomImageBtn" title="Get new random image">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <polyline points="23 4 23 10 17 10" />
+                <polyline points="1 20 1 14 7 14" />
+                <path
+                  d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"
+                />
+              </svg>
+              Random
+            </button>
+            <button id="settingsBtn" title="Open settings">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M12 15a3 3 0 100-6 3 3 0 000 6z" />
+                <path
+                  d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"
+                />
+              </svg>
+              Settings
+            </button>
+          </div>
         </div>
       </div>
     </div>
-  </div>
 
-  <script type="module" src="newTab.js"></script>
-</body>
+    <!-- Custom Context Menu -->
+    <div class="context-menu" id="contextMenu">
+      <ul>
+        <li id="contextDownload">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+          Download Image
+        </li>
+        <li id="contextDelete">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+          Delete Image
+        </li>
+        <li id="contextHistory">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          View History
+        </li>
+        <div class="context-menu-divider"></div>
+        <li id="contextToggleUI">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+          </svg>
+          <span id="toggleUIText">Hide UI</span>
+        </li>
+        <li id="contextRandom">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <polyline points="23 4 23 10 17 10" />
+            <polyline points="1 20 1 14 7 14" />
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+          </svg>
+          New Random Image
+        </li>
+      </ul>
+    </div>
+
+    <!-- History Modal -->
+    <div class="history-modal" id="historyModal">
+      <div class="history-modal-content">
+        <div class="history-modal-header">
+          <h2>📜 Image History</h2>
+          <button class="history-modal-close" id="closeHistoryModal">✕ Close</button>
+        </div>
+        <div class="history-list" id="historyList">
+          <div class="history-empty">No history yet</div>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="newTab.js"></script>
+  </body>
 </html>

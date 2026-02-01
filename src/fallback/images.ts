@@ -1,4 +1,4 @@
-import { ImageData } from "../content/db";
+import { ImageData } from "../config";
 
 export const FALLBACK_IMAGES: Omit<
   ImageData,
