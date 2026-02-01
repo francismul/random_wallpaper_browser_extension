@@ -149,7 +149,7 @@ async function displayImage(
 
     // Select transition based on animation direction
     let transitionType: TransitionType;
-    let direction: "left" | "right" | "up" | "down" = "right";
+    let direction: "left" | "right" | "up" | "down";
 
     if (animationDirection === "next") {
       // Going to older images - eliminate left-to-right transitions
