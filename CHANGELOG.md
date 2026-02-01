@@ -24,7 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### **New Transitions**
 
-- New Transition mechanism, relying on canvas and vanila javascript to perform transitions
+- New Transition mechanism, relying on canvas and vanilla javascript to perform transitions
 - Supported transitions
   - Wipe (default)
   - Slide
