@@ -1,12 +1,9 @@
 {
   "manifest_version": 3,
   "name": "Random Wallpaper",
-  "version": "3.0.0",
+  "version": "4.0.0",
   "description": "Display random wallpapers from Unsplash and Pexels on new tabs",
-  "permissions": [
-    "storage",
-    "alarms"
-  ],
+  "permissions": ["storage", "alarms"],
   "host_permissions": [
     "https://api.unsplash.com/*",
     "https://api.pexels.com/*"

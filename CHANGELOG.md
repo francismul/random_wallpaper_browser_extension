@@ -5,6 +5,41 @@ All notable changes to the Random Wallpaper Extension will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.0] - 2026-01-28
+
+### Added
+
+#### **Custom Logging System**
+
+- Added new custom logging that helps with debugging the application with custom colors for different codes
+- The logging system gives python logging module vibes
+
+#### **Custom Context Menu**
+
+- Added a custom context menu for the newtab page
+- Supports:
+  - Image download
+  - History navigation
+  - Getting a random new Image
+
+#### **New Transitions**
+
+- New Transition mechanism, relying on canvas and vanilla javascript to perform transitions
+- Supported transitions
+  - Wipe (default)
+  - Slide
+  - Fade
+  - Ripple
+  - Pixel Dissolve
+  - Pixelation
+  - Noise Reveal
+
+### Changed
+
+#### **Project Structure**
+
+- Changed the project structure to adopt a better maintainable variant with separation of concerns on different modules
+
 ## [3.0.0] - 2026-01-18
 
 ### Changed
@@ -32,7 +67,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### **Github Workflow**
 
-- Github workflow for 
+- Github workflow for the project
 
 #### **pnpm package manager**
 
@@ -170,7 +205,6 @@ This version represents a complete rewrite and rebranding from the original "Cut
 - Auto-refresh configuration (5-300 seconds)
 - Clock display settings (12/24-hour format, optional seconds)
 - Cache statistics dashboard with relative time display
-- Visual status indicators (green=working, red=failed, gray=untested)
 
 #### ⚡ **Immediate Fetch System**
 

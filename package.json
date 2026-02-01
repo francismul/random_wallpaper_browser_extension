@@ -1,6 +1,6 @@
 {
   "name": "random-wallpaper-extension",
-  "version": "3.0.1",
+  "version": "4.0.0",
   "description": "A browser extension that displays random wallpapers from Unsplash and Pexels",
   "type": "module",
   "scripts": {

@@ -1,6 +1,6 @@
-# Contributing to Cute Wallpapers Extension
+# Contributing to Random Wallpaper Browser Extension
 
-Thank you for your interest in contributing to the Cute Wallpapers Extension! This document provides guidelines for contributing to the project.
+Thank you for your interest in contributing to the Random Wallpaper Browser Extension! This document provides guidelines for contributing to the project.
 
 ## 🤝 How to Contribute
 
@@ -152,4 +152,4 @@ If you have questions about contributing:
 - Create a new issue with the "question" label
 - Be specific about what you're trying to achieve
 
-Thank you for helping make the Cute Wallpapers Extension better! 🌸
+Thank you for helping make the Random Wallpaper Browser Extension better! 🌸

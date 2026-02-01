@@ -1,7 +1,7 @@
 # Random Wallpaper Extension
 
 - 🌐 **Works Without Internet**: All images cached locally, displays work completely offline
-- ⏳ **Auto Expiry**: Images expire after 24 hours to keep content fresh
+- ⏳ **Auto Expiry**: Images expire after 24 hours to keep content fresh with option for permanent storage
 - 🔁 **Automatic Refresh**: Fetches new images every 6 hours in the backgroundaper Extension
 
 A TypeScript-based browser extension I built that displays beautiful random wallpapers from Unsplash and Pexels on every new tab. It features a comprehensive settings page, smart caching, and works even without API keys!
@@ -14,7 +14,6 @@ A TypeScript-based browser extension I built that displays beautiful random wall
 - �️ **Smart Fallback**: 20 beautiful default images when no API keys are configured
 - 🔍 **Search Keywords**: Customize image themes for each API source
 - �💾 **Smart Caching**: Stores images in IndexedDB for offline access
-- ⏳ **Auto Expiry**: Images expire after 24 hours to keep content fresh
 - 🔁 **Automatic Refresh**: Fetches new images every 6 hours in the background
 - 🔄 **Auto-Refresh Display**: Optional auto-rotating images on new tab (5-300s intervals)
 - 🕐 **Clock Display**: Beautiful clock with date, 12/24hr format, and optional seconds
@@ -94,7 +93,6 @@ The extension works immediately with 20 beautiful fallback images! For fresh dai
 - **Storage Size**: Expect ~160-400MB total storage (80 images × 2-5MB each)
 - **Memory Management**: Object URLs created/revoked automatically to prevent memory leaks
 - **Offline First**: All stored in IndexedDB with metadata (source, author, URL, timestamps)
-- **Expiry**: Each image expires after 24 hours, cleaned automatically
 
 ### New Tab Display
 
@@ -121,25 +119,33 @@ The extension works immediately with 20 beautiful fallback images! For fresh dai
 ### Watch Mode
 
 ```bash
-npm run watch
+pnpm run watch
 ```
 
 ### Project Structure
 
 ```
 src/
-├── background.ts          # Service worker (periodic fetching, immediate fetch on key add)
-├── manifest.json          # Extension manifest
-├── newTab.html           # New tab page UI
-├── options.html          # Settings page UI
-├── content/
-│   ├── api.ts            # Unsplash/Pexels API integration (80 images!)
-│   ├── db.ts             # IndexedDB wrapper
-│   ├── newTab.ts         # New tab page logic (auto-refresh, clock)
-│   └── fallback.ts       # 20 default wallpapers
-├── options.ts            # Settings page logic (API testing, stats)
-└── utils/
-    └── random.ts         # Crypto-random utilities
+├── api/
+│   └── index.ts        // Api Related logic
+├── config/
+│   └── index.ts        // Project global Configurations settings
+├── db/
+│   └── index.ts        // Indexeddb Related logic
+├── logger/
+│   └── index.ts        // Custom console.log logger
+├── storage/
+│   └── index.ts        // Storage Related configurations settings (chrome.storage.local)
+├── transitions/
+│   └── index.ts        // Transitions Related logic
+├── utils/
+│   └── index.ts        // Common utilies functions and logic
+├── background.ts       // Background worker
+├── manifest.json       // Extensions manifest file
+├── newTab.html         // newTab page implementation
+├── newTab.ts           // newTab page script
+├── options.html        // Options page implementation
+└── options.ts          // Options page script
 ```
 
 ### Technologies Used
@@ -189,7 +195,6 @@ The service worker may sleep when the browser is idle. When it wakes up:
 
 - **API Limits**: Unsplash (50 req/hr), Pexels (200 req/hr) - I stay well within limits
 - **Refresh Interval**: 6-hour cycle keeps you under rate limits
-- **Storage**: URLs only (not blobs) to save space (~16KB for 80 images)
 - **Persistence**: API keys and settings survive extension updates
 - **Privacy**: Your API keys never leave your browser
 - **Offline**: Works perfectly offline after initial fetch
@@ -203,7 +208,5 @@ MIT
 Feel free to submit issues or pull requests!
 
 ---
-
-**Enjoy your beautiful new tab experience! 🎨✨**
 
 _Built with TypeScript, love, and a passion for beautiful wallpapers._
