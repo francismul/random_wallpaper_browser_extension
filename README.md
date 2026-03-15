@@ -18,6 +18,8 @@ A TypeScript-based browser extension I built that displays beautiful random wall
 - 🔄 **Auto-Refresh Display**: Optional auto-rotating images on new tab (5-300s intervals)
 - 🕐 **Clock Display**: Beautiful clock with date, 12/24hr format, and optional seconds
 - 🎲 **True Random Selection**: Uses Web Crypto API for cryptographically secure randomness
+- 🧠 **Smarter Refresh Randomization**: Avoids recently shown images using a shuffle queue and a configurable “recent history” limit (adjustable in the options page).
+- 🎨 **Minimal UI with Lucide icons**: Consistent iconography and cleaner layout across new tab and settings.
 - ⚡ **Fast Loading**: All images served from local cache
 - 📊 **Cache Statistics**: Real-time stats showing total, valid, expired images by source
 - 🎨 **Beautiful UI**: Clean, modern interface with smooth transitions

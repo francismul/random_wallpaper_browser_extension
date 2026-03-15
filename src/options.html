@@ -5,598 +5,613 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Random Wallpaper Settings</title>
     <style>
-      * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
+      :root {
+        --icon-size: 18px;
+        --icon-color: #e5e7eb;
       }
 
+      i[data-lucide] {
+        width: var(--icon-size);
+        height: var(--icon-size);
+        color: var(--icon-color);
+      }
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
       html {
         color-scheme: dark;
       }
 
       body {
-        font-family: "Courier New", Courier, monospace;
         margin: 0;
         padding: 0;
-        height: 100vh;
-        overflow: hidden;
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+          Arial, sans-serif;
+        min-height: 100vh;
+        display: flex;
+        background: #18181b;
+        justify-content: center;
       }
 
       .container {
-        height: 100vh;
-        max-width: 1200px;
-        margin: 0 auto;
-        box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
+        width: 100%;
+        max-width: 900px;
+        padding: 0 20px 60px 20px;
       }
 
-      header {
-        background: #2d2d2d;
-        color: #00ff9d;
-        padding: 5px 10px;
-        flex-shrink: 0;
-        box-shadow: 0 4px 0 rgba(0, 0, 0, 0.5);
-        z-index: 10;
-        border-bottom: 2px solid #333;
-      }
-
-      .header-content {
+      .header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 15px;
+        gap: 12px;
+        position: sticky;
+        top: 0;
+        z-index: 50;
+        padding: 24px 0 16px 0;
+        margin-bottom: 32px;
+        background: #18181b;
+        border-bottom: 1px solid #27272a;
       }
 
-      .title-section {
-        flex: 1;
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .logo {
+        width: 40px;
+        height: 40px;
+        background: #3b82f6;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        flex-shrink: 0;
+      }
+
+      .brand-text h1 {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 600;
+      }
+
+      .brand-text p {
+        margin: 2px 0 0;
+        font-size: 13px;
+        color: #9ca3af;
       }
 
       .header-actions {
         display: flex;
         align-items: center;
-        gap: 15px;
+        gap: 10px;
+        flex-shrink: 0;
+        flex-wrap: wrap;
       }
 
-      .loading-indicator {
-        display: flex;
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        padding: 9px 16px;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        border: none;
+        transition:
+          background 0.2s,
+          opacity 0.2s;
+      }
+
+      .btn:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
+
+      .btn-primary {
+        background: #3b82f6;
+        color: white;
+      }
+
+      .btn-primary:hover:not(:disabled) {
+        background: #2563eb;
+      }
+
+      .btn-secondary {
+        background: transparent;
+        border: 1px solid #3f3f46;
+        color: #e5e7eb;
+      }
+
+      .btn-secondary:hover:not(:disabled) {
+        background: #27272a;
+      }
+
+      .btn-danger {
+        background: transparent;
+        border: 1px solid #7f1d1d;
+        color: #f87171;
+      }
+
+      .btn-danger:hover:not(:disabled) {
+        background: #450a0a;
+      }
+
+      .btn-sm {
+        padding: 6px 12px;
+        font-size: 13px;
+      }
+
+      #loadingIndicator {
+        display: none;
         align-items: center;
         gap: 8px;
-        color: rgba(255, 255, 255, 0.9);
-        font-size: 14px;
+        font-size: 13px;
+        color: #9ca3af;
       }
 
       .spinner {
         width: 16px;
         height: 16px;
-        border: 2px solid rgba(0, 255, 157, 0.3);
-        border-top: 2px solid rgba(0, 255, 157, 0.9);
+        border: 2px solid #3f3f46;
+        border-top-color: #06b6d4;
         border-radius: 50%;
-        animation: spin 1s linear infinite;
+        animation: spin 0.8s linear infinite;
       }
 
       @keyframes spin {
-        0% {
+        from {
           transform: rotate(0deg);
         }
-        100% {
+        to {
           transform: rotate(360deg);
         }
       }
 
-      h1 {
-        font-size: 28px;
-        margin-bottom: 8px;
+      #message {
+        display: none;
+        font-size: 13px;
+        font-weight: 500;
+        padding: 4px 12px;
+        border-radius: 20px;
       }
 
-      .subtitle {
-        opacity: 0.9;
-        font-size: 14px;
+      #message.show {
+        display: inline-flex;
+        align-items: center;
       }
 
-      .content {
-        flex: 1;
-        overflow-y: auto;
-        overflow-x: hidden;
-        padding: 20px;
-        scroll-behavior: smooth;
-
-        /* Bento Grid Layout */
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(1fr, 1fr));
-        gap: 30px; /* Increased gap */
-        align-content: start;
+      #message.success {
+        background: #064e3b;
+        color: #34d399;
       }
 
-      /* Custom scrollbar styling */
-      .content::-webkit-scrollbar {
-        width: 12px;
+      #message.error {
+        background: #450a0a;
+        color: #f87171;
       }
 
-      .content::-webkit-scrollbar-track {
-        background: #121212;
+      #message.info {
+        background: #0c2a4a;
+        color: #60a5fa;
       }
 
-      .content::-webkit-scrollbar-thumb {
-        background: #444;
-        border: 2px solid #121212;
-        border-radius: 0;
-      }
-
-      .content::-webkit-scrollbar-thumb:hover {
-        background: #00ff9d;
-      }
-
-      .section {
-        margin-bottom: 0;
-        opacity: 0;
-        animation: fadeInUp 0.6s ease forwards;
-
-        /* Bento Card Styling */
-        background: #2d2d2d;
-        border: 2px solid #444;
+      .card {
+        background: #18181b;
+        border: 1px solid #27272a;
         border-radius: 12px;
-        padding: 30px; /* Increased padding */
-        box-shadow: 6px 6px 0px rgba(0, 0, 0, 0.4);
-        transition: transform 0.2s;
-
-        display: flex;
-        flex-direction: column;
-        gap: 20px; /* Added spacing between items inside card */
-      }
-
-      .section:hover {
-        transform: translate(-2px, -2px);
-        box-shadow: 8px 8px 0px rgba(0, 0, 0, 0.4);
-        border-color: #667eea;
-      }
-
-      /* Make some sections span full width if needed */
-      .section.full-width {
-        grid-column: 1 / -1;
-      }
-
-      /* Last card horizontal fill logic */
-      .section:last-of-type {
-        grid-column: 1 / -1;
-      }
-
-      /* Ensure button group at bottom spans full width */
-      .content > .button-group {
-        grid-column: 1 / -1;
-        width: 100%;
-        display: flex;
-        justify-content: flex-end;
-        border-top: 1px solid #333;
-        padding-top: 20px;
-        margin-top: 10px;
-      }
-
-      .section:nth-child(1) {
-        animation-delay: 0.1s;
-      }
-      .section:nth-child(2) {
-        animation-delay: 0.2s;
-      }
-      .section:nth-child(3) {
-        animation-delay: 0.3s;
-      }
-      .section:nth-child(4) {
-        animation-delay: 0.4s;
-      }
-      .section:nth-child(5) {
-        animation-delay: 0.5s;
-      }
-
-      .section:last-child {
-        margin-bottom: 0;
-      }
-
-      @keyframes fadeInUp {
-        from {
-          opacity: 0;
-          transform: translateY(20px);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0);
-        }
-      }
-
-      .section-title svg {
-        width: 24px;
-        height: 24px;
-        stroke: #00ff9d;
-      }
-
-      .form-group {
+        padding: 24px;
         margin-bottom: 20px;
       }
 
-      label {
-        display: block;
+      .section-title {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 15px;
         font-weight: 600;
-        margin-bottom: 8px;
-        color: #aaa;
-        font-family: inherit;
+        color: #fff;
+        margin: 0 0 20px 0;
+      }
+
+      .section-title i {
+        color: #06b6d4;
+      }
+
+      .setting-group {
+        margin-bottom: 28px;
+      }
+
+      .setting-group:last-child {
+        margin-bottom: 0;
+      }
+
+      .setting-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 16px;
+        margin-bottom: 16px;
+      }
+
+      .setting-info h3 {
+        margin: 0 0 4px 0;
+        font-size: 14px;
+        font-weight: 600;
+        color: #e5e7eb;
+      }
+
+      .setting-info p {
+        margin: 0;
+        font-size: 13px;
+        color: #9ca3af;
+        line-height: 1.5;
+      }
+
+      .toggle {
+        position: relative;
+        display: inline-block;
+        width: 44px;
+        height: 24px;
+        flex-shrink: 0;
+      }
+
+      .toggle input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+
+      .slider {
+        position: absolute;
+        cursor: pointer;
+        inset: 0;
+        background: #3f3f46;
+        border-radius: 24px;
+        transition: 0.3s;
+      }
+
+      .slider::before {
+        content: "";
+        position: absolute;
+        height: 18px;
+        width: 18px;
+        left: 3px;
+        bottom: 3px;
+        background: white;
+        border-radius: 50%;
+        transition: 0.3s;
+      }
+
+      input:checked + .slider {
+        background: #06b6d4;
+      }
+
+      input:checked + .slider::before {
+        transform: translateX(20px);
+      }
+
+      .checkbox-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 12px;
+      }
+
+      .checkbox-row:last-child {
+        margin-bottom: 0;
+      }
+
+      .checkbox-row input[type="checkbox"] {
+        width: 16px;
+        height: 16px;
+        accent-color: #06b6d4;
+        cursor: pointer;
+        flex-shrink: 0;
+      }
+
+      .checkbox-row label {
+        font-size: 14px;
+        color: #e5e7eb;
+        cursor: pointer;
+      }
+
+      .input-label {
+        display: block;
+        font-size: 13px;
+        color: #9ca3af;
+        margin-bottom: 6px;
+      }
+
+      .input-wrapper {
+        position: relative;
       }
 
       input[type="text"],
       input[type="password"],
-      input[type="number"],
-      textarea {
+      textarea,
+      select {
         width: 100%;
-        padding: 12px;
-        border: 2px solid #555;
-        border-radius: 4px;
+        background: #27272a;
+        border: 1px solid #3f3f46;
+        border-radius: 8px;
+        padding: 10px 12px;
+        color: #e5e7eb;
         font-size: 14px;
-        font-family: "Courier New", Courier, monospace;
-        background: #121212;
-        color: #00ff9d;
-        transition: border-color 0.3s;
+        font-family: inherit;
+        transition: border-color 0.2s;
       }
 
       input[type="text"]:focus,
       input[type="password"]:focus,
-      input[type="number"]:focus,
-      textarea:focus {
+      textarea:focus,
+      select:focus {
         outline: none;
-        border-color: #00ff9d;
-        box-shadow: 0 0 10px rgba(0, 255, 157, 0.2);
+        border-color: #06b6d4;
       }
 
-      button,
-      .button {
-        background: #333;
-        color: #00ff9d;
-        border: 2px solid #00ff9d;
-        padding: 16px 32px;
-        border-radius: 6px;
+      input[type="password"] {
+        padding-right: 40px;
+      }
+
+      .eye-icon {
+        position: absolute;
+        right: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #9ca3af;
         cursor: pointer;
-        font-size: 14px;
-        font-weight: 700;
-        font-family: "Courier New", Courier, monospace;
-        text-transform: uppercase;
-        transition: all 0.2s;
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        box-shadow: 4px 4px 0px #111;
-      }
-
-      button:hover,
-      .button:hover {
-        background: #00ff9d;
-        color: #121212;
-        transform: translate(-1px, -1px);
-        box-shadow: 6px 6px 0px #111;
-      }
-
-      button:active,
-      .button:active {
-        transform: translate(1px, 1px);
-        box-shadow: 2px 2px 0px #111;
-      }
-
-      button.secondary {
-        background: #333;
-        border-color: #aaa;
-        color: #aaa;
-      }
-
-      button.secondary:hover {
-        background: #aaa;
-        color: #121212;
-      }
-
-      button.danger {
-        background: #333;
-        border-color: #ff4d4d;
-        color: #ff4d4d;
-      }
-
-      button.danger:hover {
-        background: #ff4d4d;
-        color: white;
-      }
-
-      button.success {
-        background: #333;
-        border-color: #28a745;
-        color: #28a745;
-        transition: all 0.3s;
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-
-        border-radius: 4px;
-        margin-bottom: 10px;
-        border: 1px solid #444;
-      }
-
-      .api-key-item .source {
-        font-weight: 600;
-        min-width: 100px;
-        color: #00ff9d;
-      }
-
-      .api-key-item .key {
-        flex: 1;
-        font-family: monospace;
-        font-size: 13px;
-        color: #999;
-      }
-
-      button.secondary:hover {
-        background: #5a6268;
-        color: black;
-        font-weight: bold;
-      }
-
-      button.danger {
-        background: #dc3545;
-        color: black;
-        font-weight: bold;
-      }
-
-      button.danger:hover {
-        background: #c82333;
-        color: black;
-        font-weight: bold;
-      }
-
-      button.success {
-        background: #28a745;
-        color: black;
-        font-weight: bold;
-      }
-
-      button.success:hover {
-        background: #218838;
-        color: black;
-        font-weight: bold;
-      }
-
-      button:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-        transform: none;
-      }
-
-      .api-key-item {
+        background: none;
+        border: none;
+        padding: 0;
         display: flex;
-        gap: 10px;
         align-items: center;
-        padding: 12px;
-        border-radius: 8px;
-        margin-bottom: 10px;
-        border: 1px solid black;
-        box-shadow: 4px 4px 0 #111;
       }
 
-      .api-key-item .source {
-        font-weight: 600;
-        min-width: 100px;
-        color: #667eea;
+      textarea {
+        min-height: 80px;
+        resize: vertical;
       }
 
-      .api-key-item .key {
-        flex: 1;
-        font-family: monospace;
-        font-size: 13px;
-        color: #ff0000;
-        overflow: hidden;
-        text-overflow: ellipsis;
+      select {
+        appearance: none;
+        cursor: pointer;
       }
 
-      .api-key-item .status {
-        padding: 4px 12px;
-        border-radius: 12px;
+      .char-counter {
         font-size: 12px;
-        font-weight: 500;
+        color: #6b7280;
+        margin-top: 4px;
       }
 
-      .setting-description {
-        color: #999;
-      }
-
-      .stat-card {
-        background: #222;
-        color: #00ff9d;
-        padding: 20px;
-        border-radius: 8px;
-        text-align: center;
-        border: 2px solid #333;
-        box-shadow: 4px 4px 0 #111;
-      }
-
-      .stat-card .value {
-        font-size: 32px;
-        font-weight: 700;
-        margin-bottom: 5px;
-        font-family: "Courier New", Courier, monospace;
-      }
-
-      .stat-card.secondary {
-        background: #222;
-        color: black;
-        border-color: #ff00de;
-        font-weight: bold;
-      }
-
-      .stat-card.tertiary {
-        border-color: #00f2fe;
-        background: #222;
-        color: black;
-        font-weight: bold;
-      }
-
-      .checkbox-label {
-        flex: 1;
-        color: #333;
-      }
-
-      .checkbox-label strong {
-        display: block;
-        margin-bottom: 4px;
-        color: #333;
-        font-weight: bold;
-      }
-
-      .setting-description {
-        font-size: 13px;
-        color: #666;
-        font-weight: bold;
-        line-height: 1.4;
-      }
-
-      .stats-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-        gap: 15px;
-      }
-
-      .stat-card {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        font-weight: bold;
-        padding: 20px;
-        border-radius: 8px;
-        text-align: center;
-      }
-
-      .stat-card .value {
-        font-size: 32px;
-        font-weight: 700;
-        margin-bottom: 5px;
-      }
-
-      .stat-card .label {
-        font-size: 13px;
-        opacity: 0.9;
-      }
-
-      .stat-card.secondary {
-        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-      }
-
-      .stat-card.tertiary {
-        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-      }
-
-      .message {
-        padding: 8px 16px;
-        border-radius: 6px;
-        font-size: 14px;
-        font-weight: 500;
-        display: none;
-        align-items: center;
-        gap: 8px;
-        margin-top: 10px;
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        backdrop-filter: blur(10px);
-      }
-
-      .message.show {
-        display: flex;
-      }
-
-      .message.success {
-        background: rgba(212, 237, 218, 0.95);
-        color: #155724;
-        border-color: rgba(195, 230, 203, 0.8);
-      }
-
-      .message.error {
-        background: rgba(248, 215, 218, 0.95);
-        color: #721c24;
-        border-color: rgba(245, 198, 203, 0.8);
-      }
-
-      .message.info {
-        background: rgba(209, 236, 241, 0.95);
-        color: #0c5460;
-        border-color: rgba(190, 229, 235, 0.8);
-      }
-
-      .help-text {
-        font-size: 13px;
-        color: #6c757d;
-        margin-top: 5px;
-      }
-
-      .button-group {
-        display: flex;
-        gap: 10px;
-        margin-top: 20px;
-      }
-
-      .slider-group {
+      .slider-row {
         display: flex;
         align-items: center;
-        gap: 15px;
+        gap: 12px;
+        margin-top: 8px;
       }
 
       input[type="range"] {
         flex: 1;
-        height: 6px;
-        border-radius: 3px;
-        background: #444;
-        outline: none;
-      }
-
-      input[type="range"]::-webkit-slider-thumb {
-        -webkit-appearance: none;
-        appearance: none;
-        width: 20px;
-        height: 20px;
-        border-radius: 50%;
-        background: #00ff9d;
+        accent-color: #06b6d4;
         cursor: pointer;
-        box-shadow: 0 0 5px #00ff9d;
       }
 
-      input[type="range"]::-moz-range-thumb {
-        width: 20px;
-        height: 20px;
-        border-radius: 50%;
-        background: #00ff9d;
-        cursor: pointer;
-        border: none;
-        box-shadow: 0 0 5px #00ff9d;
-      }
-
-      .interval-display {
-        min-width: 80px;
-        text-align: center;
+      .range-value {
+        font-size: 13px;
         font-weight: 600;
-        color: #00ff9d;
-        font-family: "Courier New", Courier, monospace;
+        color: #06b6d4;
+        min-width: 40px;
+        text-align: right;
       }
 
-      /* Log Popup Styles */
+      .api-status-row {
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+        margin-bottom: 16px;
+        font-size: 13px;
+        color: #9ca3af;
+      }
+
+      .api-key-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 12px;
+        background: #27272a;
+        border: 1px solid #3f3f46;
+        border-radius: 8px;
+        margin-bottom: 8px;
+        font-size: 13px;
+        flex-wrap: wrap;
+      }
+
+      .api-key-item .source {
+        font-weight: 600;
+        color: #e5e7eb;
+        min-width: 60px;
+      }
+
+      .api-key-item .key {
+        flex: 1;
+        font-family: monospace;
+        color: #9ca3af;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .api-key-item .status {
+        padding: 2px 8px;
+        border-radius: 10px;
+        font-size: 12px;
+      }
+
+      .api-key-item .status.valid {
+        background: #064e3b;
+        color: #34d399;
+      }
+
+      .api-key-item .status.invalid {
+        background: #450a0a;
+        color: #f87171;
+      }
+
+      .api-key-item .status.unknown,
+      .api-key-item .status.testing {
+        background: #1c1c1f;
+        color: #9ca3af;
+      }
+
+      .api-key-item .status.valid-stale {
+        background: #1a3a2a;
+        color: #6ee7b7;
+      }
+
+      .api-key-item .status.invalid-stale {
+        background: #2a1010;
+        color: #fca5a5;
+      }
+
+      .api-key-item .test-btn {
+        margin-left: auto;
+      }
+
+      .add-key-form {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        align-items: flex-end;
+        margin-top: 16px;
+      }
+
+      .add-key-form select {
+        flex: 0 0 120px;
+      }
+
+      .add-key-form .key-input-wrap {
+        flex: 1;
+        min-width: 160px;
+      }
+
+      .add-key-form .key-input-wrap input {
+        width: 100%;
+      }
+
+      .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+
+      .stat-card {
+        background: #27272a;
+        border: 1px solid #3f3f46;
+        border-radius: 8px;
+        padding: 14px 16px;
+        text-align: center;
+      }
+
+      .stat-card .stat-value {
+        font-size: clamp(12px, 2vw, 20px);
+        font-weight: 700;
+        color: #e5e7eb;
+        margin-bottom: 4px;
+        word-break: break-word;
+      }
+
+      .stat-card .stat-label {
+        font-size: 12px;
+        color: #9ca3af;
+      }
+
+      .btn-row {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 16px;
+      }
+
+      .info-box {
+        background: #083344;
+        border: 1px solid #164e63;
+        border-radius: 8px;
+        padding: 14px 16px;
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        margin-top: 20px;
+      }
+
+      .info-box i {
+        color: #06b6d4;
+        flex-shrink: 0;
+        margin-top: 2px;
+      }
+
+      .info-box p {
+        margin: 0;
+        font-size: 13px;
+        color: #cffafe;
+        line-height: 1.5;
+      }
+
+      .divider {
+        border: none;
+        border-top: 1px solid #27272a;
+        margin: 20px 0;
+      }
+
+      #transitionsList {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 10px;
+      }
+
+      #logsContainer {
+        background: #0a0a0c;
+        color: #ddd;
+        font-family: "Consolas", "Courier New", monospace;
+        font-size: 12px;
+        height: 400px;
+        overflow-y: auto;
+        padding: 10px;
+        border: 1px solid #27272a;
+        border-radius: 8px;
+        white-space: pre-wrap;
+        word-break: break-all;
+      }
+
+      .log-toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+      }
+
       .log-popup {
         position: fixed;
-        top: 20px;
+        bottom: 20px;
         right: 20px;
-        width: 25vw;
-        height: 25vh;
-        min-width: 300px;
-        min-height: 200px;
-        background: rgba(30, 30, 30, 0.95);
-        border: 2px solid #444;
-        border-radius: 8px;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        width: 520px;
+        max-height: 400px;
+        background: #18181b;
+        border: 1px solid #27272a;
+        border-radius: 12px;
+        z-index: 9999;
+        overflow: hidden;
         display: flex;
         flex-direction: column;
-        z-index: 10000;
-        backdrop-filter: blur(10px);
-        font-family: inherit;
-        animation: fadeIn 0.3s ease;
-        resize: both;
-        overflow: hidden;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
       }
 
       .log-popup.hidden {
@@ -604,21 +619,17 @@
       }
 
       .log-popup-header {
-        background: rgba(0, 0, 0, 0.3);
-        padding: 8px 12px;
-        border-bottom: 1px solid #444;
         display: flex;
         justify-content: space-between;
         align-items: center;
-        border-top-left-radius: 6px;
-        border-top-right-radius: 6px;
-        cursor: move; /* Indicate draggable if we implemented drag, sticking to fixed for now */
+        padding: 10px 14px;
+        border-bottom: 1px solid #27272a;
+        font-size: 13px;
+        font-weight: 600;
+        color: #9ca3af;
       }
 
       .log-popup-title {
-        color: #00ff9d;
-        font-weight: bold;
-        font-size: 13px;
         display: flex;
         align-items: center;
         gap: 6px;
@@ -627,716 +638,474 @@
       .log-popup-close {
         background: none;
         border: none;
-        color: #aaa;
-        font-size: 18px;
+        color: #9ca3af;
         cursor: pointer;
-        padding: 4px;
+        font-size: 18px;
         line-height: 1;
-        box-shadow: none;
-        min-width: auto;
-        width: auto;
-        height: auto;
+        padding: 0 4px;
       }
 
       .log-popup-close:hover {
-        color: #fff;
-        background: rgba(255, 255, 255, 0.1);
-        transform: none;
-        box-shadow: none;
+        color: #e5e7eb;
       }
 
-      .log-popup-content {
+      #popupLogsContainer {
         flex: 1;
         overflow-y: auto;
-        padding: 0;
+        padding: 8px 10px;
+        font-family: "Consolas", "Courier New", monospace;
         font-size: 11px;
         color: #ddd;
-        font-family: 'Consolas', 'Courier New', monospace;
-        word-break: break-all;
         white-space: pre-wrap;
-      }
-      
-      .log-popup-content::-webkit-scrollbar {
-        width: 8px;
-      }
-      
-      .log-popup-content::-webkit-scrollbar-track {
-        background: rgba(0,0,0,0.2);
-      }
-      
-      .log-popup-content::-webkit-scrollbar-thumb {
-        background: #555;
-        border-radius: 4px;
+        word-break: break-all;
+        background: #0a0a0c;
       }
 
-      @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(-10px); }
-        to { opacity: 1; transform: translateY(0); }
+      .footer-actions {
+        display: flex;
+        gap: 12px;
+        padding: 24px 0 0 0;
+        flex-wrap: wrap;
       }
 
-      /* Responsive Design */
-      @media (max-width: 768px) {
-        .container {
-          max-width: 100%;
-          height: 100vh;
-        }
-
-        header {
-          padding: 20px;
-        }
-
-        h1 {
-          font-size: 24px;
-        }
-
-        .content {
-          padding: 20px;
-        }
-
-        .stats-grid {
-          grid-template-columns: 1fr;
-        }
-
-        .button-group {
-          flex-direction: column;
-        }
-
-        .button-group button {
-          width: 100%;
-        }
-      }
-
-      @media (max-width: 480px) {
-        header {
-          padding: 15px;
-        }
-
-        h1 {
-          font-size: 20px;
-        }
-
-        .content {
-          padding: 15px;
-        }
-
-        .stat-card .value {
-          font-size: 24px;
-        }
+      a {
+        color: #06b6d4;
       }
     </style>
   </head>
   <body>
     <div class="container">
-      <header>
-        <div class="header-content">
-          <div class="title-section">
-            <h1>⚙️ Random Wallpaper Settings</h1>
-            <p class="subtitle">Configure your wallpaper experience</p>
+      <!-- Header -->
+      <div class="header">
+        <div class="brand">
+          <div class="logo">
+            <i data-lucide="image" width="22" height="22"></i>
           </div>
-          <div class="header-actions">
-            <button id="saveSettingsBtn" class="success">
-              <svg
-                width="16"
-                height="16"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M5 13l4 4L19 7"
-                />
-              </svg>
-              Save Settings
-            </button>
-            <button id="resetSettingsBtn" class="danger">
-              Reset to Defaults
-            </button>
-            <a
-              href="newTab.html"
-              class="button"
-              style="text-decoration: none; padding: 10px 20px; font-size: 13px"
-            >
-              <svg
-                width="16"
-                height="16"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                style="margin-right: 5px"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M10 19l-7-7m0 0l7-7m-7 7h18"
-                />
-              </svg>
-              Back to New Tab
-            </a>
-
-            <div
-              id="loadingIndicator"
-              class="loading-indicator"
-              style="display: none"
-            >
-              <div class="spinner"></div>
-            </div>
+          <div class="brand-text">
+            <h1>Random Wallpaper Settings</h1>
+            <p>Configure your wallpaper experience</p>
           </div>
         </div>
-        <div id="message" class="message"></div>
-      </header>
-
-      <div class="content">
-        <!-- API Keys Section -->
-        <section class="section">
-          <h2 class="section-title">
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
-              />
-            </svg>
-            API Keys
-          </h2>
-
-          <div
-            style="
-              background: #222;
-              padding: 15px;
-              border-radius: 8px;
-              border: 1px solid #444;
-              margin-bottom: 20px;
-            "
-          >
-            <p style="font-size: 14px; color: #aaa; margin-bottom: 10px">
-              ℹ️ <strong>Single API Support:</strong> You can use just Unsplash
-              OR Pexels, or configure both!
-            </p>
-            <div
-              id="apiStatus"
-              style="display: flex; gap: 15px; font-size: 13px; color: #e0e0e0"
-            >
-              <div id="unsplashStatus">
-                📷 Unsplash:
-                <span style="color: #ff4d4d; font-weight: 600"
-                  >Not Configured</span
-                >
-              </div>
-              <div id="pexelsStatus">
-                🖼️ Pexels:
-                <span style="color: #ff4d4d; font-weight: 600"
-                  >Not Configured</span
-                >
-              </div>
-            </div>
+        <div class="header-actions">
+          <div id="loadingIndicator">
+            <div class="spinner"></div>
+            <span>Saving...</span>
           </div>
-          <div id="apiKeysList"></div>
+          <span id="message"></span>
+          <button id="saveSettingsBtn" class="btn btn-primary">
+            <i data-lucide="save" width="15" height="15"></i> Save Settings
+          </button>
+        </div>
+      </div>
 
-          <div class="form-group">
-            <label>Add New API Key</label>
-            <div class="input-group">
-              <div>
-                <select
-                  id="apiSource"
-                  style="
-                    width: 100%;
-                    padding: 12px;
-                    border: 2px solid #555;
-                    border-radius: 8px;
-                    font-size: 14px;
-                  "
-                >
-                  <option value="unsplash">Unsplash</option>
-                  <option value="pexels">Pexels</option>
-                </select>
-              </div>
-              <div style="flex: 2; margin-top: 10px; margin-bottom: 10px">
-                <input
-                  type="password"
-                  id="apiKeyInput"
-                  placeholder="Enter API key"
-                />
-              </div>
-              <button id="addApiKeyBtn">Add Key</button>
-              <button id="testApiKeyBtn" class="secondary">Test</button>
-            </div>
+      <!-- Image Sources -->
+      <div class="card">
+        <div class="section-title">
+          <i data-lucide="layers" width="18" height="18"></i> Image Sources
+        </div>
+        <div class="api-status-row">
+          <div id="unsplashStatus">
+            Unsplash:
+            <span style="color: #f87171; font-weight: 600">Not Configured</span>
           </div>
-        </section>
-
-        <!-- Search Preferences Section -->
-        <section class="section">
-          <h2 class="section-title">
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-              />
-            </svg>
-            Search Preferences
-          </h2>
-
-          <div class="form-group">
-            <label>Unsplash Keywords (comma-separated)</label>
-            <textarea
-              id="unsplashKeywords"
-              placeholder="nature, landscape, mountains, ocean"
-            ></textarea>
-            <p class="help-text">Leave empty for random curated images</p>
+          <div id="pexelsStatus">
+            Pexels:
+            <span style="color: #f87171; font-weight: 600">Not Configured</span>
           </div>
-
-          <div class="form-group">
-            <label>Pexels Keywords (comma-separated)</label>
-            <textarea
-              id="pexelsKeywords"
-              placeholder="nature, landscape, mountains, ocean"
-            ></textarea>
-            <p class="help-text">Leave empty for random curated images</p>
-          </div>
-        </section>
-
-        <!-- Auto Refresh Section -->
-        <section class="section">
-          <h2 class="section-title">
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-              />
-            </svg>
-            Auto Refresh
-          </h2>
-
-          <div class="checkbox-group">
-            <input type="checkbox" id="autoRefreshEnabled" />
-            <label for="autoRefreshEnabled" style="margin: 0"
-              >Enable auto image refresh on new tab page</label
-            >
-          </div>
-
-          <div class="form-group">
-            <label>Refresh Interval (seconds)</label>
-            <div class="slider-group">
-              <input
-                type="range"
-                id="autoRefreshInterval"
-                min="5"
-                max="300"
-                step="5"
-                value="30"
-              />
-              <span class="interval-display" id="intervalDisplay">30s</span>
-            </div>
-            <p class="help-text">
-              Automatically change to a new random image while viewing the new
-              tab
-            </p>
-          </div>
-        </section>
-
-        <!-- Clock Settings Section -->
-        <section class="section">
-          <h2 class="section-title">
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-            Clock & Date
-          </h2>
-
-          <div class="checkbox-group">
-            <input type="checkbox" id="clockEnabled" />
-            <label for="clockEnabled" style="margin: 0"
-              >Show clock on new tab page</label
-            >
-          </div>
-
-          <div class="checkbox-group">
-            <input type="checkbox" id="clock24Hour" />
-            <label for="clock24Hour" style="margin: 0"
-              >Use 24-hour format</label
-            >
-          </div>
-
-          <div class="checkbox-group">
-            <input type="checkbox" id="clockShowSeconds" />
-            <label for="clockShowSeconds" style="margin: 0">Show seconds</label>
-          </div>
-
-          <div class="checkbox-group">
-            <input type="checkbox" id="clockShowDate" />
-            <label for="clockShowDate" style="margin: 0">Show date</label>
-          </div>
-        </section>
-
-        <!-- UI Button Visibility Section -->
-        <section class="section">
-          <h2 class="section-title">
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"
-              />
-            </svg>
-            Button Visibility
-          </h2>
-
-          <p class="help-text" style="margin-bottom: 15px">
-            Control which buttons are visible on the new tab page
-          </p>
-
-          <div class="checkbox-group">
-            <input type="checkbox" id="showRefreshButton" />
-            <label for="showRefreshButton" style="margin: 0"
-              >Show Random Image button</label
-            >
-          </div>
-
-          <div class="checkbox-group">
-            <input type="checkbox" id="showSettingsButton" />
-            <label for="showSettingsButton" style="margin: 0"
-              >Show Settings button</label
-            >
-          </div>
-
-          <p class="help-text" style="margin-top: 15px; font-style: italic; color: #888">
-            Note: If you hide the Settings button, you can still access this page by typing "chrome://extensions" in your address bar and clicking on this extension's details.
-          </p>
-        </section>
-
-        <!-- History Navigation Section -->
-        <section class="section">
-          <h2 class="section-title">
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z M3 12a9 9 0 0118 0"
-              />
-            </svg>
-            📜 Image History
-          </h2>
-
-          <div class="checkbox-group">
-            <input type="checkbox" id="historyEnabled" />
-            <label for="historyEnabled" style="margin: 0"
-              >Enable image history navigation</label
-            >
-          </div>
-
-          <p class="help-text" style="margin: 10px 0 15px">
-            Navigate through previously displayed images using arrow buttons or
-            keyboard shortcuts (← / →)
-          </p>
-
-          <div class="form-group">
-            <label for="historyMaxSize">
-              Maximum History Size:
-              <span id="historySizeDisplay">15</span> images
-            </label>
+        </div>
+        <div id="apiKeysList"></div>
+        <hr class="divider" />
+        <label class="input-label">Add New API Key</label>
+        <div class="add-key-form">
+          <select id="apiSource">
+            <option value="unsplash">Unsplash</option>
+            <option value="pexels">Pexels</option>
+          </select>
+          <div class="key-input-wrap">
             <input
-              type="range"
-              id="historyMaxSize"
-              min="5"
-              max="50"
-              step="5"
-              value="15"
-              style="width: 100%"
+              type="password"
+              id="apiKeyInput"
+              placeholder="Paste your API key here"
             />
-            <p class="help-text">
-              Number of previous images to remember (5-50)
+          </div>
+          <button id="addApiKeyBtn" class="btn btn-primary btn-sm">
+            Add Key
+          </button>
+        </div>
+        <div class="info-box">
+          <i data-lucide="check-circle-2" width="18" height="18"></i>
+          <p>
+            No API keys? No problem. The extension uses a curated fallback pool
+            of beautiful wallpapers that also works offline.
+          </p>
+        </div>
+      </div>
+
+      <!-- Search Preferences -->
+      <div class="card">
+        <div class="section-title">
+          <i data-lucide="search" width="18" height="18"></i> Search Preferences
+        </div>
+        <div class="setting-group">
+          <label class="input-label" for="unsplashKeywords"
+            >Unsplash Keywords (comma-separated)</label
+          >
+          <textarea
+            id="unsplashKeywords"
+            placeholder="nature, landscape, mountains, ocean"
+          ></textarea>
+          <div class="char-counter">
+            <span id="unsplashKeywordsCounter">0 characters</span> &middot;
+            Leave empty for random curated images
+          </div>
+        </div>
+        <div class="setting-group">
+          <label class="input-label" for="pexelsKeywords"
+            >Pexels Keywords (comma-separated)</label
+          >
+          <textarea
+            id="pexelsKeywords"
+            placeholder="nature, landscape, mountains, ocean"
+          ></textarea>
+          <div class="char-counter">
+            <span id="pexelsKeywordsCounter">0 characters</span> &middot; Leave
+            empty for random curated images
+          </div>
+        </div>
+      </div>
+
+      <!-- Auto Refresh -->
+      <div class="card">
+        <div class="section-title">
+          <i data-lucide="refresh-cw" width="18" height="18"></i> Auto Refresh
+        </div>
+        <div class="setting-row">
+          <div class="setting-info">
+            <h3>Enable Auto Refresh</h3>
+            <p>
+              Automatically cycle through wallpapers while viewing the new tab
+              page.
             </p>
           </div>
+          <label class="toggle"
+            ><input type="checkbox" id="autoRefreshEnabled" /><span
+              class="slider"
+            ></span
+          ></label>
+        </div>
+        <label class="input-label">Refresh Interval</label>
+        <div class="slider-row">
+          <input
+            type="range"
+            id="autoRefreshInterval"
+            min="5"
+            max="300"
+            step="5"
+            value="30"
+          />
+          <span class="range-value" id="intervalDisplay">30s</span>
+        </div>
+      </div>
 
-          <div class="stats-grid" style="margin-top: 20px">
-            <div class="stat-card">
-              <div class="value" id="historyCount">0</div>
-              <div class="label">Images in History</div>
-            </div>
+      <!-- Clock and Date -->
+      <div class="card">
+        <div class="section-title">
+          <i data-lucide="clock" width="18" height="18"></i> Clock &amp; Date
+        </div>
+        <div class="setting-row">
+          <div class="setting-info">
+            <h3>Show Clock</h3>
+            <p>Display a live clock on the new tab page.</p>
           </div>
-
-          <div style="margin-top: 15px">
-            <button id="clearHistoryBtn" class="secondary" style="width: auto">
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <path
-                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                />
-              </svg>
-              Clear History
-            </button>
-          </div>
-        </section>
-
-        <!-- Transition Effects Section -->
-        <section class="section">
-          <h2 class="section-title">
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"
-              />
-            </svg>
-            ✨ Transition Effects
-          </h2>
-
-          <p class="help-text" style="margin-bottom: 15px">
-            Select which visual transition effects to use when changing images.
-            Only selected transitions will be randomly chosen during image
-            changes.
-          </p>
-
-          <div id="transitionsList" style="display: grid; gap: 10px">
-            <!-- Transitions checkboxes will be dynamically generated here -->
-          </div>
-
-          <p
-            class="help-text"
-            style="margin-top: 15px; font-style: italic; color: #888"
+          <label class="toggle"
+            ><input type="checkbox" id="clockEnabled" /><span
+              class="slider"
+            ></span
+          ></label>
+        </div>
+        <hr class="divider" />
+        <div class="checkbox-row">
+          <input type="checkbox" id="clock24Hour" /><label for="clock24Hour"
+            >Use 24-hour format</label
           >
-            Note: Some transitions may have performance impacts on certain
-            devices.
-          </p>
-        </section>
-
-        <!-- Cache Settings Section -->
-        <section class="section">
-          <h2 class="section-title">
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"
-              />
-            </svg>
-            Cache Settings
-          </h2>
-
-          <div class="form-group">
-            <label class="checkbox-container">
-              <input type="checkbox" id="permanentCacheEnabled" />
-              <span class="checkbox-label">
-                <label for="permanentCacheEnabled">Permanent Cache Mode</label>
-                <div class="setting-description">
-                  When enabled, cached images are stored forever and will never
-                  be automatically deleted. You can manually refresh the cache
-                  using the "Force Refresh Cache" button below.
-                </div>
-              </span>
-            </label>
-          </div>
-
-          <div class="form-group">
-            <button id="forceRefreshCacheBtn" class="secondary">
-              <svg
-                width="16"
-                height="16"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                />
-              </svg>
-              Force Refresh Cache
-            </button>
-            <div class="setting-description" style="margin-top: 8px">
-              Manually fetch new images from APIs and replace the current cache
-              (works regardless of permanent cache setting).
-            </div>
-          </div>
-        </section>
-
-        <!-- Cache Statistics Section -->
-        <section class="section">
-          <h2 class="section-title">
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-              />
-            </svg>
-            Cache Statistics
-          </h2>
-
-          <div class="stats-grid">
-            <div class="stat-card">
-              <div class="value" id="totalItems">0</div>
-              <div class="label">Total Items</div>
-            </div>
-            <div class="stat-card secondary">
-              <div class="value" id="validItems">0</div>
-              <div class="label">Valid Items</div>
-            </div>
-            <div class="stat-card tertiary">
-              <div class="value" id="expiredItems">0</div>
-              <div class="label">Expired Items</div>
-            </div>
-          </div>
-
-          <div class="stats-grid" style="margin-top: 15px">
-            <div class="stat-card">
-              <div class="value" id="unsplashCount">0</div>
-              <div class="label">Unsplash</div>
-            </div>
-            <div class="stat-card secondary">
-              <div class="value" id="pexelsCount">0</div>
-              <div class="label">Pexels</div>
-            </div>
-            <div class="stat-card tertiary">
-              <div class="value" id="lastFetchTime">Never</div>
-              <div class="label">Last Fetch</div>
-            </div>
-          </div>
-
-          <div class="button-group">
-            <button id="refreshStatsBtn" class="secondary">
-              <svg
-                width="16"
-                height="16"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                />
-              </svg>
-              Refresh Stats
-            </button>
-            <button id="clearCacheBtn" class="danger">
-              <svg
-                width="16"
-                height="16"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                />
-              </svg>
-              Clear Cache
-            </button>
-          </div>
-        </section>
-
-        <!-- Debug Logs Section -->
-        <section class="section full-width">
-          <h2 class="section-title">
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"
-              />
-            </svg>
-            Debug Logs
-          </h2>
-
-          <div
-            style="
-              display: flex;
-              justify-content: space-between;
-              margin-bottom: 10px;
-              align-items: center;
-            "
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="clockShowSeconds" /><label
+            for="clockShowSeconds"
+            >Show seconds</label
           >
-            <div class="checkbox-group" style="margin: 0">
-              <input type="checkbox" id="logsAutoScroll" checked />
-              <label for="logsAutoScroll" style="margin: 0">Auto-scroll</label>
-            </div>
-            <div>
-              <button
-                id="popoutLogsBtn"
-                class="secondary"
-                style="padding: 5px 10px; font-size: 12px; margin-right: 8px;"
-              >
-                Popout
-              </button>
-              <button
-                id="clearLogsBtn"
-                class="secondary"
-                style="padding: 5px 10px; font-size: 12px"
-              >
-                Clear
-              </button>
-            </div>
-          </div>
-
-          <div
-            id="logsContainer"
-            style="
-              background: #111;
-              color: #ddd;
-              font-family: 'Consolas', 'Courier New', monospace;
-              font-size: 12px;
-              height: 300px;
-              overflow-y: auto;
-              padding: 10px;
-              border: 1px solid #444;
-              border-radius: 4px;
-              white-space: pre-wrap;
-              word-break: break-all;
-            "
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="clockShowDate" /><label for="clockShowDate"
+            >Show date</label
           >
-            <div style="color: #666; text-align: center; padding-top: 130px">
-              Waiting for logs...
-            </div>
-          </div>
-        </section>
+        </div>
+      </div>
 
-        <!-- Save Settings -->
-        <!-- Log Popup -->
+      <!-- Button Visibility -->
+      <div class="card">
+        <div class="section-title">
+          <i data-lucide="mouse-pointer-2" width="18" height="18"></i> Button
+          Visibility
+        </div>
+        <p style="font-size: 13px; color: #9ca3af; margin: 0 0 16px">
+          Control which buttons appear on the new tab page. You can always
+          access Settings via
+          <code style="color: #06b6d4">chrome://extensions</code> if the
+          Settings button is hidden.
+        </p>
+        <div class="checkbox-row">
+          <input type="checkbox" id="showRefreshButton" /><label
+            for="showRefreshButton"
+            >Show Refresh button</label
+          >
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="showSettingsButton" /><label
+            for="showSettingsButton"
+            >Show Settings button</label
+          >
+        </div>
+      </div>
+
+      <!-- Image History -->
+      <div class="card">
+        <div class="section-title">
+          <i data-lucide="history" width="18" height="18"></i> Image History
+        </div>
+        <div class="setting-row">
+          <div class="setting-info">
+            <h3>Enable History Navigation</h3>
+            <p>
+              Navigate through previously displayed wallpapers using arrow keys
+              (&#8592; / &#8594;) or nav buttons.
+            </p>
+          </div>
+          <label class="toggle"
+            ><input type="checkbox" id="historyEnabled" /><span
+              class="slider"
+            ></span
+          ></label>
+        </div>
+        <hr class="divider" />
+        <label class="input-label"
+          >Maximum History Size:
+          <span id="historySizeDisplay">15</span> images</label
+        >
+        <div class="slider-row">
+          <input
+            type="range"
+            id="historyMaxSize"
+            min="5"
+            max="50"
+            step="5"
+            value="15"
+          />
+        </div>
+        <label class="input-label"
+          >Avoid Recently Viewed Images (history)
+          <span id="recentHistoryLimitDisplay">10</span> images
+          <span class="tooltip" title="This prevents the refresh button from selecting images that were shown recently.">
+            <i data-lucide="info" width="14" height="14"></i>
+          </span>
+        </label
+        >
+        <div class="slider-row">
+          <input
+            type="range"
+            id="recentHistoryLimit"
+            min="1"
+            max="50"
+            step="1"
+            value="10"
+          />
+        </div>
+        <div class="stats-grid" style="margin-top: 16px">
+          <div class="stat-card">
+            <div class="stat-value" id="historyCount">0</div>
+            <div class="stat-label">In History</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="historyHealth">—</div>
+            <div class="stat-label">Usage</div>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button id="clearHistoryBtn" class="btn btn-danger btn-sm">
+            <i data-lucide="trash-2" width="14" height="14"></i> Clear History
+          </button>
+        </div>
+      </div>
+
+      <!-- Transition Effects -->
+      <div class="card">
+        <div class="section-title">
+          <i data-lucide="sparkles" width="18" height="18"></i> Transition
+          Effects
+        </div>
+        <p style="font-size: 13px; color: #9ca3af; margin: 0 0 16px">
+          Select which visual transitions to use when changing wallpapers. At
+          least one must remain enabled.
+        </p>
+        <label class="input-label" style="margin-bottom: 10px; display: block;">
+          Default transition type:
+          <select id="defaultTransition" style="margin-top: 8px; width: 100%; max-width: 320px;">
+            <option value="random">Random</option>
+          </select>
+        </label>
+        <div id="transitionsList"></div>
+      </div>
+
+      <!-- Cache Settings -->
+      <div class="card">
+        <div class="section-title">
+          <i data-lucide="database" width="18" height="18"></i> Cache Settings
+        </div>
+        <div class="setting-row">
+          <div class="setting-info">
+            <h3>Permanent Cache Mode</h3>
+            <p>
+              Store wallpapers permanently and use the Force Refresh button to
+              manually update the cache.
+            </p>
+          </div>
+          <label class="toggle"
+            ><input type="checkbox" id="permanentCacheEnabled" /><span
+              class="slider"
+            ></span
+          ></label>
+        </div>
+        <hr class="divider" />
+        <button id="forceRefreshCacheBtn" class="btn btn-secondary btn-sm">
+          <i data-lucide="zap" width="14" height="14"></i> Force Refresh Cache
+        </button>
+        <p style="font-size: 12px; color: #6b7280; margin-top: 8px">
+          Fetches new images from APIs and replaces the current cache,
+          regardless of permanent cache setting.
+        </p>
+      </div>
+
+      <!-- Cache Statistics -->
+      <div class="card">
+        <div class="section-title">
+          <i data-lucide="bar-chart-2" width="18" height="18"></i> Cache
+          Statistics
+        </div>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-value" id="totalItems">0</div>
+            <div class="stat-label">Total Images</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="validItems">0</div>
+            <div class="stat-label">Valid</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="expiredItems">0</div>
+            <div class="stat-label">Expired</div>
+          </div>
+        </div>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-value" id="unsplashCount">0</div>
+            <div class="stat-label">Unsplash</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="pexelsCount">0</div>
+            <div class="stat-label">Pexels</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="fallbackCount">0</div>
+            <div class="stat-label">Fallback</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="lastFetchTime">Never</div>
+            <div class="stat-label">Last Fetch</div>
+          </div>
+        </div>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-value" id="cacheHealth">—</div>
+            <div class="stat-label">Cache Health</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="freshness">—</div>
+            <div class="stat-label">Freshness</div>
+          </div>
+        </div>
+        <div id="dbStats" style="display: none"></div>
+        <div class="btn-row">
+          <button id="refreshStatsBtn" class="btn btn-secondary btn-sm">
+            <i data-lucide="refresh-cw" width="14" height="14"></i> Refresh
+            Stats
+          </button>
+          <button id="cleanupCacheBtn" class="btn btn-secondary btn-sm">
+            <i data-lucide="sparkles" width="14" height="14"></i> Clean Expired
+          </button>
+          <button id="clearCacheBtn" class="btn btn-danger btn-sm">
+            <i data-lucide="trash-2" width="14" height="14"></i> Clear All Cache
+          </button>
+        </div>
+      </div>
+
+      <!-- Debug Logs -->
+      <div class="card">
+        <div class="section-title">
+          <i data-lucide="terminal" width="18" height="18"></i> Debug Logs
+        </div>
+        <div class="setting-row" style="align-items: center;">
+          <div class="setting-info">
+            <h3>Log Level</h3>
+            <p>Set the minimum log level to display in the debug console.</p>
+          </div>
+          <select id="logLevelSelect">
+            <option value="DEBUG">Debug</option>
+            <option value="INFO">Info</option>
+            <option value="WARN">Warn</option>
+            <option value="ERROR">Error</option>
+          </select>
+        </div>
+        <div class="log-toolbar">
+          <div class="checkbox-row" style="margin: 0">
+            <input type="checkbox" id="logsAutoScroll" checked /><label
+              for="logsAutoScroll"
+              >Auto-scroll</label
+            >
+          </div>
+          <div style="display: flex; gap: 8px">
+            <button id="popoutLogsBtn" class="btn btn-secondary btn-sm">
+              Popout</button
+            ><button id="clearLogsBtn" class="btn btn-secondary btn-sm">
+              Clear
+            </button>
+          </div>
+        </div>
+        <div id="logsContainer" style="overflow-x: auto"></div>
+      </div>
+
+      <!-- Footer -->
+      <div class="footer-actions">
+        <button id="resetSettingsBtn" class="btn btn-danger">
+          <i data-lucide="rotate-ccw" width="15" height="15"></i> Reset to
+          Defaults
+        </button>
+      </div>
+    </div>
+
+    <!-- Log popup -->
     <div id="logPopup" class="log-popup hidden">
       <div class="log-popup-header">
         <div class="log-popup-title">
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width: 14px; height: 14px;">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
-          </svg>
-          Debug Logs
+          <i data-lucide="terminal" width="13" height="13"></i> Debug Logs
         </div>
-        <button id="closePopupBtn" class="log-popup-close" title="Close Popup">&times;</button>
+        <button id="closePopupBtn" class="log-popup-close" title="Close">
+          &times;
+        </button>
       </div>
-      <div id="popupLogsContainer" class="log-popup-content"></div>
+      <div id="popupLogsContainer"></div>
     </div>
+
+    <div id="loading" style="display: none"></div>
 
     <script type="module" src="options.js"></script>
   </body>
