@@ -3,31 +3,45 @@
  * Handles image display, transitions, history navigation, clock, and auto-refresh
  * for the random wallpaper browser extension.
  */
-
+import { createIcons, icons } from "lucide";
 import {
-  addToHistory,
-  getAllValidImages,
   getHistory,
-  getHistoryImageById,
-  getLastFetchTime,
   deleteImage,
-  wasImageViewedRecently,
+  addToHistory,
+  getLastFetchTime,
+  getAllValidImages,
+  getHistoryImageById,
 } from "./db";
 import {
-  REFRESH_INTERVAL_MS,
+  Settings,
   ImageData,
+  HistoryEntry,
+  TransitionType,
+  DEFAULT_SETTINGS,
+  DEFAULT_APP_STATE,
+  REFRESH_INTERVAL_MS,
   DEFAULT_HISTORY_ENABLED,
   DEFAULT_HISTORY_MAX_SIZE,
-  DEFAULT_APP_STATE,
-  TransitionType,
   DEFAULT_ENABLED_TRANSITIONS,
-  HistoryEntry,
-  Settings,
-  DEFAULT_SETTINGS,
+  DEFAULT_CONFIG,
+  LogLevel,
 } from "./config";
 import { Logger } from "./logger";
 import { getSettings } from "./storage";
 import { CanvasTransitionManager } from "./transitions";
+import { formatTimeAgo } from "./utils";
+import {
+  AnimationDirection,
+  buildShuffleOrder,
+  formatDate,
+  formatTime,
+  getRandomTransition,
+  getSourceDisplayName,
+  getSourceUrl,
+  isAutoRefreshEnabled,
+  pickNextFromShuffle,
+} from "./newTabLogic";
+import { broadcastCurrentImageId } from "./messaging";
 
 const newTab_logger = new Logger("New Tab");
 
@@ -47,6 +61,16 @@ const settingsBtn = document.getElementById("settingsBtn") as HTMLButtonElement;
 const randomImageBtn = document.getElementById(
   "randomImageBtn",
 ) as HTMLButtonElement;
+const uiLayer = document.getElementById("uiLayer") as HTMLElement;
+
+const infoBtn = document.getElementById("infoBtn") as HTMLButtonElement;
+const infoOverlay = document.getElementById("infoOverlay") as HTMLElement;
+const closeInfoBtn = document.getElementById("closeInfoBtn") as HTMLElement;
+const infoPhotographer = document.getElementById(
+  "infoPhotographer",
+) as HTMLElement;
+const infoSource = document.getElementById("infoSource") as HTMLElement;
+const infoResolution = document.getElementById("infoResolution") as HTMLElement;
 
 /**
  * Canvas transition manager
@@ -55,7 +79,9 @@ let canvasTransitionManager: CanvasTransitionManager;
 try {
   canvasTransitionManager = new CanvasTransitionManager(wallpaperCanvas);
 } catch (error) {
-  newTab_logger.error("Failed to initialize canvas transition manager:", error);
+  newTab_logger.error(
+    `Failed to initialize canvas transition manager: ${error}`,
+  );
   throw error;
 }
 
@@ -81,6 +107,7 @@ const historyTotal = document.getElementById("historyTotal") as HTMLElement;
  */
 const clockContainer = document.getElementById("clockContainer") as HTMLElement;
 const timeDisplay = document.getElementById("timeDisplay") as HTMLElement;
+const timeAmPm = document.getElementById("timeAmPm") as HTMLElement;
 const dateDisplay = document.getElementById("dateDisplay") as HTMLElement;
 
 /**
@@ -92,25 +119,6 @@ const appState = DEFAULT_APP_STATE;
 // Track all blob URLs to prevent memory leaks
 const blobUrlCache = new Set<string>();
 
-/**
- * Animation direction types for image transitions
- */
-type AnimationDirection = "next" | "prev" | "fade";
-
-/**
- * Get a random transition effect for general use
- * Uses all enabled transitions
- */
-function getRandomTransition(
-  enabledTransitions: TransitionType[],
-): TransitionType {
-  const validTransitions: TransitionType[] =
-    enabledTransitions.length > 0
-      ? enabledTransitions
-      : DEFAULT_ENABLED_TRANSITIONS;
-  const randomIndex = Math.floor(Math.random() * validTransitions.length);
-  return validTransitions[randomIndex] as TransitionType;
-}
 
 /**
  * Displays an image with smooth canvas-based transitions
@@ -129,6 +137,7 @@ async function displayImage(
   try {
     // Store current image data for context menu download
     currentImageData = imageData;
+    currentImageResolution = null;
 
     // Hide context menu when new image loads
     hideContextMenu();
@@ -136,16 +145,16 @@ async function displayImage(
     // Fade out credit during transition
     creditDiv.classList.remove("visible");
 
-    newTab_logger.debug(`Animation Direction: ${animationDirection}`);
-    newTab_logger.debug(`Skip History: ${skipHistory}`);
-
     // Get enabled transitions from settings
     const enabledTransitions =
       settings.transition?.enabledTransitions || DEFAULT_ENABLED_TRANSITIONS;
 
-    newTab_logger.debug("Checking the enabled Transitions value:", {
-      enabledTransitions,
-    });
+    // Determine which transition type to use (random by default)
+    const requestedTransition = settings.transition?.defaultTransition;
+    const defaultTransitionType =
+      requestedTransition && enabledTransitions.includes(requestedTransition)
+        ? requestedTransition
+        : null;
 
     // Select transition based on animation direction
     let transitionType: TransitionType;
@@ -153,17 +162,18 @@ async function displayImage(
 
     if (animationDirection === "next") {
       // Going to older images - eliminate left-to-right transitions
-      transitionType = getRandomTransition(enabledTransitions);
+      transitionType =
+        defaultTransitionType || getRandomTransition(enabledTransitions);
       direction = Math.random() > 0.5 ? "left" : "up";
-      newTab_logger.debug("Next button ClIcked", { transitionType, direction });
     } else if (animationDirection === "prev") {
       // Going to newer images - eliminate right-to-left transitions
-      transitionType = getRandomTransition(enabledTransitions);
+      transitionType =
+        defaultTransitionType || getRandomTransition(enabledTransitions);
       direction = Math.random() > 0.5 ? "right" : "down";
-      newTab_logger.debug("Prev button ClIcked", { transitionType, direction });
     } else {
-      // General transition - use all enabled transitions
-      transitionType = getRandomTransition(enabledTransitions);
+      // General transition - use enabled transitions
+      transitionType =
+        defaultTransitionType || getRandomTransition(enabledTransitions);
       // Randomly select any direction for initial load to add variety
       const directions: ("left" | "right" | "up" | "down")[] = [
         "left",
@@ -173,11 +183,7 @@ async function displayImage(
       ];
       const randomIndex = Math.floor(Math.random() * directions.length);
       direction = directions[randomIndex]!;
-
-      newTab_logger.debug("Not a button Event", transitionType, direction);
     }
-
-    newTab_logger.debug(`Final Direction: ${direction}`);
 
     // Perform canvas transition
     await canvasTransitionManager.transition(imageData.blob, transitionType, {
@@ -208,11 +214,19 @@ async function displayImage(
         await loadHistoryList();
         updateHistoryUI();
       } catch (error) {
-        newTab_logger.error("Failed to add to history:", error);
+        newTab_logger.error(`Failed to add to history: ${error}`);
       }
     }
+
+    // Keep other extension contexts in sync with current image
+    try {
+      chrome.storage.local.set({ currentImageId: imageData.id });
+      broadcastCurrentImageId(imageData.id);
+    } catch (e) {
+      newTab_logger.warn("Failed to broadcast current image update", e);
+    }
   } catch (error) {
-    newTab_logger.error("Failed to display image:", error);
+    newTab_logger.error(`Failed to display image: ${error}`);
     throw error;
   }
 }
@@ -239,39 +253,6 @@ function updateCreditInfo(imageData: ImageData): void {
   sourceSpan.appendChild(sourceLink);
 }
 
-/**
- * Generates the appropriate source URL for different image sources
- * Handles Unsplash UTM parameters and Pexels photographer pages
- * @param source - The image source type ('unsplash', 'pexels', or 'other')
- * @returns The formatted URL for the image source
- */
-function getSourceUrl(source: ImageData["source"]): string {
-  switch (source) {
-    case "unsplash":
-      return "https://unsplash.com";
-    case "pexels":
-      return "https://pexels.com";
-    default:
-      return "#";
-  }
-}
-
-/**
- * Gets the display name for different image sources
- * Provides user-friendly names for attribution display
- * @param source - The image source type
- * @returns The human-readable source name
- */
-function getSourceDisplayName(source: ImageData["source"]): string {
-  switch (source) {
-    case "unsplash":
-      return "Unsplash";
-    case "pexels":
-      return "Pexels";
-    default:
-      return "Other";
-  }
-}
 
 /**
  * Displays fallback information when no images are available
@@ -326,7 +307,7 @@ async function showFallbackInfo(): Promise<void> {
         chrome.runtime.openOptionsPage();
       });
   } catch (error) {
-    newTab_logger.error("Failed to show fallback info:", error);
+    newTab_logger.error(`Failed to show fallback info: ${error}`);
   }
 }
 
@@ -368,7 +349,7 @@ async function loadHistoryList(): Promise<void> {
   try {
     appState.historyList = await getHistory(appState.historyMaxSize);
   } catch (error) {
-    newTab_logger.error("Failed to load history:", error);
+    newTab_logger.error(`Failed to load history: ${error}`);
     appState.historyList = [];
   }
 }
@@ -399,7 +380,7 @@ function updateHistoryUI(): void {
     // Viewing current/latest image
     prevImageBtn.style.display =
       appState.historyList.length > 0 ? "flex" : "none";
-    nextImageBtn.style.display = "none"; // Hide next when viewing current
+    nextImageBtn.style.display = "none";
     historyIndicator.classList.remove("visible");
   } else {
     // Viewing historical image
@@ -407,7 +388,8 @@ function updateHistoryUI(): void {
       appState.currentHistoryIndex < appState.historyList.length - 1
         ? "flex"
         : "none";
-    nextImageBtn.style.display = "flex"; // Show next to go forward in history
+    nextImageBtn.style.display =
+      appState.currentHistoryIndex <= 0 ? "none" : "flex";
     historyIndicator.classList.add("visible");
 
     historyPosition.textContent = (appState.currentHistoryIndex + 1).toString();
@@ -539,9 +521,10 @@ async function loadHistorySettings(settings: Settings): Promise<void> {
  * @param maxAttempts - Maximum attempts to find an unviewed image
  * @returns Random image data or null if none available
  */
-async function getRandomImageEfficient(
-  maxAttempts: number = 5,
-): Promise<ImageData | null> {
+/**
+ * Gets the next image to show via a shuffled queue + recent-history avoidance.
+ */
+async function getNextShuffledImage(settings: Settings): Promise<ImageData | null> {
   // Ensure cache is populated
   if (appState.currentImages.length === 0) {
     appState.currentImages = await getAllValidImages();
@@ -551,33 +534,41 @@ async function getRandomImageEfficient(
     return null;
   }
 
-  // Try to find an image not viewed recently
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const randomIndex = Math.floor(
-      Math.random() * appState.currentImages.length,
+  // Rebuild shuffle queue if it is missing or out of sync with cached images
+  if (
+    !appState.shuffleOrder ||
+    appState.shuffleOrder.length !== appState.currentImages.length ||
+    appState.shuffleIndex === undefined ||
+    appState.shuffleIndex >= (appState.shuffleOrder?.length ?? 0)
+  ) {
+    appState.shuffleOrder = buildShuffleOrder(
+      appState.currentImages.map((img) => img.id),
+      currentImageData?.id,
     );
-    const candidate = appState.currentImages[randomIndex];
-
-    if (!candidate) continue;
-
-    // Check if image was viewed in the last 20 minutes (0.33 hours)
-    const recentlyViewed = await wasImageViewedRecently(candidate.id, 0.33);
-
-    if (!recentlyViewed) {
-      return candidate;
-    }
-
-    newTab_logger.debug(
-      `Image ${candidate.id} was viewed recently, attempt ${attempt + 1}/${maxAttempts}`,
-    );
+    appState.shuffleIndex = 0;
   }
 
-  // If all attempts failed, return a random image anyway
-  // (better than showing nothing)
-  const fallbackIndex = Math.floor(
-    Math.random() * appState.currentImages.length,
+  const recentLimit = settings.randomization?.recentHistoryLimit ?? 10;
+  const recentlyViewedIds = new Set(
+    appState.historyList.slice(0, recentLimit).map((entry) => entry.imageId),
   );
-  return appState.currentImages[fallbackIndex] || null;
+  if (currentImageData?.id) recentlyViewedIds.add(currentImageData.id);
+
+  const { nextId, nextIndex } = pickNextFromShuffle(
+    appState.shuffleOrder,
+    appState.shuffleIndex ?? 0,
+    recentlyViewedIds,
+  );
+
+  appState.shuffleIndex = nextIndex;
+
+  if (!nextId) {
+    // Fallback to random selection
+    const fallbackIndex = Math.floor(Math.random() * appState.currentImages.length);
+    return appState.currentImages[fallbackIndex] || null;
+  }
+
+  return appState.currentImages.find((img) => img.id === nextId) || null;
 }
 
 /**
@@ -591,7 +582,7 @@ async function loadRandomImage(settings: Settings): Promise<void> {
     appState.currentHistoryIndex = -1;
     creditDiv.classList.remove("visible");
 
-    const randomImageData = await getRandomImageEfficient();
+    const randomImageData = await getNextShuffledImage(settings);
 
     if (!randomImageData) {
       showError("No images available. Please check your configuration.");
@@ -604,16 +595,8 @@ async function loadRandomImage(settings: Settings): Promise<void> {
 
     // Resume auto-refresh timer after loading current image
     await resumeAutoRefresh(settings);
-
-    // Refresh cache periodically if it's getting stale
-    // This happens in the background without blocking the UI
-    if (appState.currentImages.length > 0) {
-      getAllValidImages().then((freshImages) => {
-        appState.currentImages = freshImages;
-      });
-    }
   } catch (error) {
-    newTab_logger.error("Error loading image:", error);
+    newTab_logger.error(`Error loading image: ${error}`);
     showError("Error loading image. Please try again.");
   }
 }
@@ -625,31 +608,9 @@ async function loadRandomImage(settings: Settings): Promise<void> {
  * @param showSeconds - Whether to display seconds in the time
  */
 function updateClock(format24: boolean, showSeconds: boolean) {
-  const now = new Date();
-
-  let hours = now.getHours();
-  const minutes = now.getMinutes();
-  const seconds = now.getSeconds();
-
-  let timeString: string;
-
-  if (format24) {
-    const h = hours.toString().padStart(2, "0");
-    const m = minutes.toString().padStart(2, "0");
-    const s = seconds.toString().padStart(2, "0");
-    timeString = showSeconds ? `${h}:${m}:${s}` : `${h}:${m}`;
-  } else {
-    const period = hours >= 12 ? "PM" : "AM";
-    hours = hours % 12 || 12; // Convert to 12-hour format
-    const h = hours.toString();
-    const m = minutes.toString().padStart(2, "0");
-    const s = seconds.toString().padStart(2, "0");
-    timeString = showSeconds
-      ? `${h}:${m}:${s} ${period}`
-      : `${h}:${m} ${period}`;
-  }
-
-  timeDisplay.textContent = timeString;
+  const { time, period } = formatTime(new Date(), format24, showSeconds);
+  timeDisplay.textContent = time;
+  timeAmPm.textContent = period ?? "";
 }
 
 /**
@@ -657,14 +618,7 @@ function updateClock(format24: boolean, showSeconds: boolean) {
  * Formats date in a user-friendly format (e.g., "Monday, January 15, 2024")
  */
 function updateDate() {
-  const now = new Date();
-  const options: Intl.DateTimeFormatOptions = {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  };
-  dateDisplay.textContent = now.toLocaleDateString("en-US", options);
+  dateDisplay.textContent = formatDate(new Date());
 }
 
 /**
@@ -774,7 +728,7 @@ async function setupAutoRefresh(settings: Settings): Promise<void> {
     appState.autoRefreshTimer = null;
   }
 
-  if (settings.autoRefresh.enabled && appState.currentHistoryIndex === -1) {
+  if (isAutoRefreshEnabled(settings) && appState.currentHistoryIndex === -1) {
     const intervalMs = settings.autoRefresh.interval * 1000;
     appState.autoRefreshTimer = window.setInterval(() => {
       loadRandomImage(settings);
@@ -801,30 +755,49 @@ async function checkAndTriggerRefresh(): Promise<void> {
       chrome.runtime.sendMessage({ action: "checkRefreshNeeded" });
     }
   } catch (error) {
-    newTab_logger.error("Failed to check refresh status:", error);
+    newTab_logger.error(`Failed to check refresh status: ${error}`);
   }
 }
 
 /**
  * Event Listeners - Button actions
  */
-settingsBtn.addEventListener("click", () => {
+settingsBtn?.addEventListener("click", () => {
   chrome.runtime.openOptionsPage();
 });
 
-randomImageBtn.addEventListener("click", async () => {
+randomImageBtn?.addEventListener("click", async () => {
   const settings = await getSettings();
   await loadRandomImage(settings);
 });
 
-prevImageBtn.addEventListener("click", async () => {
+prevImageBtn?.addEventListener("click", async () => {
   const settings = await getSettings();
   await navigateToPrevious(undefined, settings);
 });
 
-nextImageBtn.addEventListener("click", async () => {
+nextImageBtn?.addEventListener("click", async () => {
   const settings = await getSettings();
   await navigateToNext(undefined, settings);
+});
+
+infoBtn?.addEventListener("click", () => {
+  showInfoCard();
+});
+
+closeInfoBtn?.addEventListener("click", () => {
+  hideInfoCard();
+});
+
+infoOverlay?.addEventListener("click", (event) => {
+  if (event.target === infoOverlay) hideInfoCard();
+});
+
+// Allow dismissing the info card with Escape
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    hideInfoCard();
+  }
 });
 
 /**
@@ -840,6 +813,9 @@ const closeHistoryModalBtn = document.getElementById(
 // Store current image data for download
 let currentImageData: ImageData | null = null;
 
+// Cache computed image resolution to avoid re-measuring on repeated info view
+let currentImageResolution: string | null = null;
+
 // Track UI visibility state
 let isUIHidden = false;
 
@@ -847,10 +823,10 @@ let isUIHidden = false;
  * Shows the custom context menu at the specified position
  */
 function showContextMenu(x: number, y: number): void {
-  contextMenu.classList.add("visible");
+  contextMenu?.classList.add("visible");
 
   // Position the menu, ensuring it stays within viewport
-  const menuRect = contextMenu.getBoundingClientRect();
+  const menuRect = contextMenu?.getBoundingClientRect();
   const viewportWidth = window.innerWidth;
   const viewportHeight = window.innerHeight;
 
@@ -874,7 +850,74 @@ function showContextMenu(x: number, y: number): void {
  * Hides the custom context menu
  */
 function hideContextMenu(): void {
-  contextMenu.classList.remove("visible");
+  contextMenu?.classList.remove("visible");
+}
+
+/**
+ * Returns the resolution of the current image (e.g. "3840×2160")
+ */
+async function getCurrentImageResolution(): Promise<string> {
+  if (currentImageResolution) return currentImageResolution;
+  if (!currentImageData) return "Unknown";
+
+  try {
+    const blobUrl = URL.createObjectURL(currentImageData.blob);
+    const image = new Image();
+
+    const loaded = new Promise<void>((resolve, reject) => {
+      image.onload = () => {
+        currentImageResolution = `${image.naturalWidth}×${image.naturalHeight}`;
+        URL.revokeObjectURL(blobUrl);
+        resolve();
+      };
+      image.onerror = () => {
+        URL.revokeObjectURL(blobUrl);
+        reject(new Error("Failed to load image for resolution"));
+      };
+    });
+
+    image.src = blobUrl;
+    await loaded;
+
+    return currentImageResolution ?? "Unknown";
+  } catch {
+    return "Unknown";
+  }
+}
+
+function showInfoCard(): void {
+  if (!currentImageData) return;
+
+  // Photographer
+  const authorLink = document.createElement("a");
+  authorLink.href = currentImageData.authorUrl;
+  authorLink.target = "_blank";
+  authorLink.rel = "noopener noreferrer";
+  authorLink.textContent = currentImageData.author || "Unknown";
+  infoPhotographer.innerHTML = "";
+  infoPhotographer.appendChild(authorLink);
+
+  // Source
+  const sourceLink = document.createElement("a");
+  sourceLink.href = getSourceUrl(currentImageData.source);
+  sourceLink.target = "_blank";
+  sourceLink.rel = "noopener noreferrer";
+  sourceLink.textContent = getSourceDisplayName(currentImageData.source);
+  infoSource.innerHTML = "";
+  infoSource.appendChild(sourceLink);
+
+  // Resolution
+  getCurrentImageResolution().then((resolution) => {
+    infoResolution.textContent = resolution;
+  });
+
+  infoOverlay?.classList.add("visible");
+  infoOverlay?.setAttribute("aria-hidden", "false");
+}
+
+function hideInfoCard(): void {
+  infoOverlay?.classList.remove("visible");
+  infoOverlay?.setAttribute("aria-hidden", "true");
 }
 
 /**
@@ -888,7 +931,7 @@ async function deleteCurrentImage(settings: Settings): Promise<void> {
 
   try {
     const imageIdToDelete = currentImageData.id;
-    newTab_logger.info("Deleting current image:", imageIdToDelete);
+    newTab_logger.info(`Deleting current image: ${imageIdToDelete}`);
 
     // Determine if we're in history view
     const inHistoryView = appState.currentHistoryIndex >= 0;
@@ -937,8 +980,15 @@ async function deleteCurrentImage(settings: Settings): Promise<void> {
     updateHistoryUI();
     newTab_logger.info("Image deleted successfully");
   } catch (error) {
-    newTab_logger.error("Failed to delete image:", error);
+    newTab_logger.error(`Failed to delete image: ${error}`);
     showError("Failed to delete image");
+  } finally {
+    // Refresh cache periodically if it's getting stale
+    // This happens in the background without blocking the UI
+    if (appState.currentImages.length > 0)
+      getAllValidImages().then((freshImages) => {
+        appState.currentImages = freshImages;
+      });
   }
 }
 
@@ -947,20 +997,19 @@ async function deleteCurrentImage(settings: Settings): Promise<void> {
  */
 function toggleUIVisibility(): void {
   isUIHidden = !isUIHidden;
-  
+
   if (isUIHidden) {
-    document.body.classList.add("ui-hidden");
+    uiLayer.classList.add("ui-hidden");
     newTab_logger.debug("UI hidden");
   } else {
-    document.body.classList.remove("ui-hidden");
+    uiLayer.classList.remove("ui-hidden");
     newTab_logger.debug("UI visible");
   }
 
   // Update context menu text
   const toggleUIText = document.getElementById("toggleUIText");
-  if (toggleUIText) {
+  if (toggleUIText)
     toggleUIText.textContent = isUIHidden ? "Show UI" : "Hide UI";
-  }
 }
 
 /**
@@ -982,6 +1031,7 @@ async function downloadCurrentImage(): Promise<void> {
 
     // Generate filename from id
     link.download = `${currentImageData.id}.jpg`;
+    link.download = `wallpaper-${currentImageData.id}.jpg`;
 
     // Trigger download
     document.body.appendChild(link);
@@ -993,7 +1043,7 @@ async function downloadCurrentImage(): Promise<void> {
 
     newTab_logger.debug(`Downloaded image: ${link.download}`);
   } catch (error) {
-    newTab_logger.error("Failed to download image:", error);
+    newTab_logger.error(`Failed to download image:", ${error}`);
   }
 }
 /**
@@ -1005,16 +1055,16 @@ async function showHistoryModal(settings: Settings): Promise<void> {
 
     let history: HistoryEntry[] = [];
 
-    if (!historyEnabled) {
+    if (!historyEnabled)
       historyList.innerHTML =
         '<div class="history-empty">History is disabled, visit options page!</div>';
-    } else {
+    else {
       history = await getHistory();
 
-      if (history.length === 0) {
+      if (history.length === 0)
         historyList.innerHTML =
           '<div class="history-empty">No history yet. Start browsing images!</div>';
-      } else {
+      else {
         // Create history items
         const items = await Promise.all(
           history.map(async (entry, index) => {
@@ -1044,7 +1094,7 @@ async function showHistoryModal(settings: Settings): Promise<void> {
 
         // Add click handlers to history items
         historyList.querySelectorAll(".history-item").forEach((item) => {
-          item.addEventListener("click", async () => {
+          item?.addEventListener("click", async () => {
             const index = parseInt((item as HTMLElement).dataset.index || "0");
             await navigateToHistoryIndex(index, settings);
             hideHistoryModal();
@@ -1055,7 +1105,7 @@ async function showHistoryModal(settings: Settings): Promise<void> {
 
     historyModal.classList.add("visible");
   } catch (error) {
-    newTab_logger.error("Failed to show history modal:", error);
+    newTab_logger.error(`Failed to show history modal: ${error}`);
   }
 }
 
@@ -1067,24 +1117,6 @@ function hideHistoryModal(): void {
 }
 
 /**
- * Formats a timestamp into a human-readable "time ago" string
- */
-function formatTimeAgo(timestamp: number): string {
-  const now = Date.now();
-  const diff = now - timestamp;
-
-  const seconds = Math.floor(diff / 1000);
-  const minutes = Math.floor(seconds / 60);
-  const hours = Math.floor(minutes / 60);
-  const days = Math.floor(hours / 24);
-
-  if (days > 0) return `${days} day${days > 1 ? "s" : ""} ago`;
-  if (hours > 0) return `${hours} hour${hours > 1 ? "s" : ""} ago`;
-  if (minutes > 0) return `${minutes} minute${minutes > 1 ? "s" : ""} ago`;
-  return "Just now";
-}
-
-/**
  * Navigates to a specific history index
  */
 async function navigateToHistoryIndex(
@@ -1093,9 +1125,7 @@ async function navigateToHistoryIndex(
 ): Promise<void> {
   const history = await getHistory();
 
-  if (index < 0 || index >= history.length) {
-    return;
-  }
+  if (index < 0 || index >= history.length) return;
 
   const historyEntry = history[index]!;
   const imageData = await getHistoryImageById(historyEntry.imageId);
@@ -1148,13 +1178,11 @@ document
     await showHistoryModal(settings);
   });
 
-document
-  .getElementById("contextToggleUI")
-  ?.addEventListener("click", (e) => {
-    e.stopPropagation();
-    toggleUIVisibility();
-    hideContextMenu();
-  });
+document.getElementById("contextToggleUI")?.addEventListener("click", (e) => {
+  e.stopPropagation();
+  toggleUIVisibility();
+  hideContextMenu();
+});
 
 document
   .getElementById("contextRandom")
@@ -1166,12 +1194,11 @@ document
   });
 
 // History modal close handlers
-closeHistoryModalBtn.addEventListener("click", () => {
+closeHistoryModalBtn?.addEventListener("click", () => {
   hideHistoryModal();
 });
 
-historyModal.addEventListener("click", (e) => {
-  // Close modal if clicking outside the content
+historyModal?.addEventListener("click", (e) => {
   if (e.target === historyModal) {
     hideHistoryModal();
   }
@@ -1201,6 +1228,13 @@ document.addEventListener("keydown", async (e) => {
 chrome.storage.onChanged.addListener(async (changes: any, areaName: any) => {
   const settings = await getSettings();
   if (areaName === "local" && changes.settings) {
+    // Update log level dynamically when settings change
+    const newSettings = changes.settings.newValue as Settings;
+    if (newSettings?.logging?.level) {
+      Logger.setGlobalLevel(newSettings.logging.level);
+      newTab_logger.debug(`Log level updated to: ${newSettings.logging.level}`);
+    }
+
     setupAutoRefresh(settings);
     setupClock(settings);
     loadHistorySettings(settings);
@@ -1217,9 +1251,7 @@ window.addEventListener("beforeunload", () => {
   }
 
   // Clean up current blob URL
-  if (appState.currentBlobUrl) {
-    URL.revokeObjectURL(appState.currentBlobUrl);
-  }
+  if (appState.currentBlobUrl) URL.revokeObjectURL(appState.currentBlobUrl);
 
   // Clean up any remaining blob URLs in cache
   blobUrlCache.forEach((url) => {
@@ -1236,14 +1268,14 @@ window.addEventListener("beforeunload", () => {
 async function refreshImageCache(): Promise<void> {
   try {
     const freshImages = await getAllValidImages();
-    
+
     // Only update if there's a meaningful change
     if (freshImages.length !== appState.currentImages.length) {
       appState.currentImages = freshImages;
       newTab_logger.debug(`Cache updated: ${freshImages.length} images`);
     }
   } catch (error) {
-    newTab_logger.error("Failed to refresh image cache:", error);
+    newTab_logger.error(`Failed to refresh image cache: ${error}`);
   }
 }
 
@@ -1258,15 +1290,25 @@ setInterval(refreshImageCache, 2 * 60 * 1000);
  * Initialize the new tab page
  */
 (async () => {
+  createIcons({ icons });
+
   try {
     const settings = await getSettings();
-    
+
+    // Apply user-configured log level to all loggers (including this page)
+    const logLevel: LogLevel =
+      (settings.logging?.level ?? DEFAULT_CONFIG.level) as LogLevel;
+    Logger.setGlobalLevel(logLevel);
+    newTab_logger.debug(`Applied log level from settings: ${logLevel}`);
+
     // Eagerly load image cache for fast random selection
     try {
       appState.currentImages = await getAllValidImages();
-      newTab_logger.debug(`Loaded ${appState.currentImages.length} images into cache`);
+      newTab_logger.debug(
+        `Loaded ${appState.currentImages.length} images into cache`,
+      );
     } catch (error) {
-      newTab_logger.error("Failed to load image cache:", error);
+      newTab_logger.error(`Failed to load image cache: ${error}`);
       appState.currentImages = [];
     }
 
@@ -1274,7 +1316,7 @@ setInterval(refreshImageCache, 2 * 60 * 1000);
     try {
       await setupClock(settings);
     } catch (error) {
-      newTab_logger.error("Failed to setup clock:", error);
+      newTab_logger.error(`Failed to setup clock: ${error}`);
       // Non-critical, continue initialization
     }
 
@@ -1282,7 +1324,7 @@ setInterval(refreshImageCache, 2 * 60 * 1000);
     try {
       await setupButtonVisibility(settings);
     } catch (error) {
-      newTab_logger.error("Failed to setup button visibility:", error);
+      newTab_logger.error(`Failed to setup button visibility: ${error}`);
       // Non-critical, continue initialization
     }
 
@@ -1290,7 +1332,7 @@ setInterval(refreshImageCache, 2 * 60 * 1000);
     try {
       await loadHistorySettings(settings);
     } catch (error) {
-      newTab_logger.error("Failed to load history settings:", error);
+      newTab_logger.error(`Failed to load history settings: ${error}`);
       // Non-critical, continue with defaults
     }
 
@@ -1298,7 +1340,7 @@ setInterval(refreshImageCache, 2 * 60 * 1000);
     try {
       await loadRandomImage(settings);
     } catch (error) {
-      newTab_logger.error("Failed to load random image:", error);
+      newTab_logger.error(`Failed to load random image: ${error}`);
       showError("Failed to load image. Please refresh the page.");
       return; // Stop initialization if image loading fails
     }
@@ -1307,7 +1349,7 @@ setInterval(refreshImageCache, 2 * 60 * 1000);
     try {
       if (appState.currentImages.length === 0) await showFallbackInfo();
     } catch (error) {
-      newTab_logger.error("Failed to show fallback info:", error);
+      newTab_logger.error(`Failed to show fallback info: ${error}`);
       // Non-critical, continue initialization
     }
 
@@ -1315,7 +1357,7 @@ setInterval(refreshImageCache, 2 * 60 * 1000);
     try {
       await setupAutoRefresh(settings);
     } catch (error) {
-      newTab_logger.error("Failed to setup auto-refresh:", error);
+      newTab_logger.error(`Failed to setup auto-refresh: ${error}`);
       // Non-critical, continue initialization
     }
 
@@ -1323,12 +1365,12 @@ setInterval(refreshImageCache, 2 * 60 * 1000);
     try {
       await checkAndTriggerRefresh();
     } catch (error) {
-      newTab_logger.error("Failed to check/trigger refresh:", error);
+      newTab_logger.error(`Failed to check/trigger refresh: ${error}`);
       // Non-critical, background operation
     }
   } catch (error) {
     // Catch-all for any unexpected errors
-    newTab_logger.error("Unexpected error during initialization:", error);
+    newTab_logger.error(`Unexpected error during initialization: ${error}`);
     showError("Failed to initialize page. Please refresh.");
   }
 })();

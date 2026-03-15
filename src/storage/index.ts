@@ -30,6 +30,9 @@ export async function getSettings(): Promise<Settings> {
   storage_logger.debug("Fetching settings from storage");
   let settings = await getFromStorage<Settings>("settings");
 
+  // If settings are missing (e.g. first install), use defaults.
+  // `DEFAULT_SETTINGS` includes default log level so that consumers can rely on
+  // `settings.logging.level` always existing.
   if (!settings) {
     storage_logger.debug("Nothing in the store");
     storage_logger.debug("Defaulting to default settings");
@@ -58,6 +61,7 @@ export async function saveSettings(settings: Settings): Promise<void> {
 export async function getLastKeywordIndex(): Promise<number> {
   storage_logger.debug("Fetching last keyword index");
   const index = await getFromStorage<number>("lastKeywordIndex");
+  storage_logger.debug(`Fetched last keyword index: ${index}`);
   return index ?? -1;
 }
 
@@ -67,7 +71,7 @@ export async function getLastKeywordIndex(): Promise<number> {
  * @returns Promise that resolves when index is saved
  */
 export async function saveLastKeywordIndex(index: number): Promise<void> {
-  storage_logger.debug("Saving last keyword index:", index);
+  storage_logger.debug(`Saving new keyword index: ${index}`);
   return new Promise((resolve) => {
     chrome.storage.local.set({ lastKeywordIndex: index }, resolve);
   });

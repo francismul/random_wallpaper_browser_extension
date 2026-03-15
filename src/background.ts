@@ -1,238 +1,46 @@
 /**
- * Background Service Worker
- * Enhanced background script for periodic image fetching, caching, and settings management
- * Provides intelligent fallback handling, rate limiting awareness, and comprehensive error recovery
+ * Background script for the Random Wallpaper Browser Extension
+ *
+ *  This script runs in a service worker context and manages background tasks such as:
+ *  - Periodic image refreshing via alarms
+ *  - Responding to messages from other contexts (new tab page, popup, options)
  */
 
-import { fetchAllImages } from "./api";
-import {
-  cleanExpiredImages,
-  getLastFetchTime,
-  getStorageInfo,
-  getValidImageCount,
-  initDB,
-  setLastFetchTime,
-  storeImages,
-} from "./db";
-import { getFallbackImages } from "./fallback";
 import {
   ALARM_NAME,
-  DEFAULT_BACKGROUND_STATE,
   IMMEDIATE_FETCH_COOLDOWN_MS,
-  MIN_STORAGE_THRESHOLD_GB,
   REFRESH_INTERVAL_HOURS,
-  REFRESH_INTERVAL_MS,
+  DEFAULT_CONFIG,
+  LogLevel,
 } from "./config";
+import { initDB, getLastFetchTime } from "./db";
 import { Logger } from "./logger";
 import { getSettings } from "./storage";
-import { areApiKeysConfigured } from "./utils";
+import {
+  backgroundState,
+  refreshImages,
+  shouldRefreshImages,
+  getCurrentImageId,
+  setCurrentImageId,
+} from "./backgroundLogic";
 
-const background_logger = new Logger("Service worker");
+const background_logger = new Logger("Service Worker");
 
-background_logger.debug("Background script at your service. 🫡");
+// Apply user-configured log level (if any) for the background context.
+// This runs early so background logs are filtered according to the user's
+// preference immediately after startup.
+getSettings()
+  .then((settings) => {
+    const level = (settings.logging?.level ?? DEFAULT_CONFIG.level) as LogLevel;
+    Logger.setGlobalLevel(level);
+    background_logger.debug(`Applied log level from settings: ${level}`);
+  })
+  .catch((error) => {
+    background_logger.warn("Unable to load settings for log level:", error);
+  });
 
-const backgroundState = DEFAULT_BACKGROUND_STATE;
+background_logger.debug("Background script at your service.");
 
-/**
- * Checks if it's time to refresh images based on configured interval
- * Uses enhanced timestamp validation and provides detailed logging
- * @returns Promise resolving to true if refresh is needed, false otherwise
- */
-async function shouldRefreshImages(): Promise<boolean> {
-  try {
-    const lastFetch = await getLastFetchTime();
-
-    if (lastFetch === null) {
-      background_logger.info(
-        "No previous fetch detected - initial refresh required",
-      );
-      return true;
-    }
-
-    const timeSinceLastFetch = Date.now() - lastFetch;
-    const hoursAgo = Math.round(timeSinceLastFetch / (1000 * 60 * 60));
-    const shouldRefresh = timeSinceLastFetch >= REFRESH_INTERVAL_MS;
-
-    if (shouldRefresh) {
-      background_logger.info(
-        `Refresh needed - last fetch was ${hoursAgo} hours ago (threshold: ${REFRESH_INTERVAL_HOURS} hours)`,
-      );
-    } else {
-      background_logger.debug(
-        `Images are fresh - last fetched ${hoursAgo} hours ago`,
-      );
-    }
-
-    return shouldRefresh;
-  } catch (error) {
-    background_logger.error("Error checking refresh status:", error);
-    return true; // Default to refresh on error
-  }
-}
-
-/**
- * Fetches and caches new images using enhanced fallback system
- * Provides comprehensive error handling, performance monitoring, and intelligent fallback
- * Integrates with rate limiting and API usage tracking for optimal resource management
- */
-async function refreshImages(): Promise<void> {
-  // Prevent concurrent fetch operations
-  if (backgroundState.isFetching) {
-    background_logger.warn("Fetch operation already in progress, skipping...");
-    return;
-  }
-
-  backgroundState.isFetching = true;
-  const startTime = Date.now();
-
-  try {
-    // Step 0: Check available storage space
-    background_logger.debug("Checking available storage space...");
-    try {
-      const storageInfo = await getStorageInfo();
-      const availableGB = (
-        storageInfo.available /
-        (1024 * 1024 * 1024)
-      ).toFixed(2);
-      background_logger.info(
-        `Storage - Available: ${availableGB}GB, Used: ${storageInfo.percentUsed.toFixed(1)}%`,
-      );
-
-      if (!storageInfo.hasEnoughSpace) {
-        background_logger.warn(
-          `Low storage space (${availableGB}GB available). Minimum ${MIN_STORAGE_THRESHOLD_GB}GB required.`,
-        );
-        background_logger.warn(
-          "Skipping image fetch to prevent storage issues.",
-        );
-        backgroundState.isFetching = false;
-        return;
-      }
-      background_logger.debug(
-        `Sufficient storage space available (${availableGB}GB)`,
-      );
-    } catch (storageError) {
-      background_logger.warn("Could not check storage space:", storageError);
-      background_logger.debug(
-        "Continuing with fetch (storage API not supported)...",
-      );
-    }
-
-    // Step 1: Check cache settings and handle permanent cache mode
-    background_logger.debug(
-      "Checking cache settings if permanent cache mode is enabled...",
-    );
-    const settings = await getSettings();
-    const permanentCacheEnabled = settings.cache?.permanentMode;
-
-    if (!permanentCacheEnabled) {
-      background_logger.debug("Permanent cache mode not enabled");
-      background_logger.debug("Can perform cleaning of expired images...");
-      const deletedCount = await cleanExpiredImages();
-      if (deletedCount > 0) {
-        background_logger.info(`Cleaned ${deletedCount} expired images`);
-      } else {
-        background_logger.debug("No expired images to clean");
-      }
-    } else {
-      background_logger.debug(
-        "Skipping image cleanup, permanent cache mode is on",
-      );
-    }
-
-    // Fetch images
-    background_logger.debug(
-      "Checking if api keys are available for images update",
-    );
-
-    const apisPresent = await areApiKeysConfigured(settings);
-
-    if (!apisPresent) {
-      background_logger.debug("No apis keys present, skipping image fetching");
-    } else {
-      background_logger.info("Fetching from configured APIs");
-
-      try {
-        const images = await fetchAllImages(settings);
-        if (images.length <= 0) {
-          background_logger.warn("Zero images downloaded");
-          backgroundState.failedFetches++;
-        } else {
-          background_logger.info(
-            `Successfully downloaded ${images.length} images from APIs`,
-          );
-          backgroundState.successfulFetches++;
-
-          background_logger.info(
-            `Storing ${images.length} images in IndexedDB...`,
-          );
-          await storeImages(images);
-          const now = Date.now();
-          await setLastFetchTime(now);
-          backgroundState.lastRefresh = now;
-
-          const duration = now - startTime;
-          background_logger.info(
-            `Successfully cached ${images.length} images in ${duration}ms`,
-          );
-        }
-      } catch (error) {
-        background_logger.warn(
-          "API fetch failed, falling back to enhanced fallback system:",
-          error,
-        );
-        backgroundState.failedFetches++;
-      }
-    }
-  } catch (error) {
-    background_logger.error("Critical error during image refresh:", error);
-    backgroundState.failedFetches++;
-
-    // Emergency fallback: ensure we have at least some images
-    try {
-      const existingImages = await getValidImageCount();
-      if (existingImages <= 0) {
-        background_logger.info(
-          "Trying to download some default emergency images",
-        );
-        const fallbackImages = await getFallbackImages();
-        if (fallbackImages && fallbackImages.length > 0) {
-          background_logger.info(
-            `Storing ${fallbackImages.length} emergency fallback images in IndexedDB...`,
-          );
-          await storeImages(fallbackImages);
-          const now = Date.now();
-          await setLastFetchTime(now);
-          backgroundState.lastRefresh = now;
-          background_logger.info(
-            `Successfully cached ${fallbackImages.length} emergency fallback images`,
-          );
-        } else {
-          background_logger.warn(
-            "Emergency fallback did not provide any images to cache",
-          );
-        }
-      }
-    } catch (emergencyError) {
-      background_logger.error("Emergency fallback failed:", emergencyError);
-    }
-  } finally {
-    backgroundState.isFetching = false;
-    const totalDuration = Date.now() - startTime;
-    background_logger.debug(`Image refresh completed in ${totalDuration}ms`);
-
-    // Log operational statistics
-    background_logger.info(
-      `Session stats - Successful fetches: ${backgroundState.successfulFetches}, Failed: ${backgroundState.failedFetches}`,
-    );
-  }
-}
-
-/**
- * Sets up periodic alarm for automatic image refresh
- * Configures Chrome alarm API to trigger image refresh at specified intervals
- * Includes enhanced logging and error handling for alarm management
- */
 function setupRefreshAlarm(): void {
   try {
     chrome.alarms.create(ALARM_NAME, {
@@ -329,6 +137,20 @@ async function handleExtensionInstall(
 // Register extension installation event listener
 chrome.runtime.onInstalled.addListener(handleExtensionInstall);
 
+// Sync current image change notifications to all connected contexts
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === "local" && changes.currentImageId?.newValue) {
+    const imageId = changes.currentImageId.newValue;
+    if (typeof imageId === "string") {
+      setCurrentImageId(imageId);
+      chrome.runtime.sendMessage({
+        action: "currentImageUpdated",
+        imageId,
+      });
+    }
+  }
+});
+
 /**
  * Check on startup (service worker wake)
  */
@@ -373,19 +195,37 @@ chrome.runtime.onStartup.addListener(async () => {
  */
 chrome.runtime.onMessage.addListener(
   (
-    message: { action: string },
+    message: any,
     sender: chrome.runtime.MessageSender,
     sendResponse: (response: any) => void,
   ): boolean => {
-    background_logger.debug(
-      "Received message:",
-      message,
-      "from sender:",
-      sender.tab?.url || "extension",
-    );
+    background_logger.debug(`Received message: ${message.action}`);
+    background_logger.debug(`from sender: ${sender.tab?.url || "extension"}`);
     backgroundState.messageCount++;
 
     try {
+      // Handle current image update broadcast
+      if (message.action === "currentImageUpdated") {
+        const imageId = (message as any).imageId;
+        if (typeof imageId === "string") {
+          setCurrentImageId(imageId);
+          background_logger.debug("Updated current image id via message", {
+            imageId,
+          });
+        }
+        sendResponse({ success: true });
+        return false;
+      }
+
+      // Provide current image id on request
+      if (message.action === "getCurrentImageId") {
+        sendResponse({
+          success: true,
+          imageId: getCurrentImageId(),
+        });
+        return false;
+      }
+
       // Handle force refresh request
       if (message.action === "forceRefresh") {
         background_logger.info("Force refresh requested");
@@ -445,9 +285,7 @@ chrome.runtime.onMessage.addListener(
 
       // Handle refresh needed check with opportunistic refresh
       if (message.action === "checkRefreshNeeded") {
-        background_logger.debug(
-          "Checking if refresh is needed (triggered from page)...",
-        );
+        background_logger.debug("Checking if refresh is needed");
 
         (async () => {
           try {
@@ -460,19 +298,13 @@ chrome.runtime.onMessage.addListener(
 
               try {
                 await refreshImages();
-                background_logger.info(
-                  "Opportunistic refresh completed successfully",
-                );
                 sendResponse({
                   success: true,
                   triggered: true,
                   message: "Cache was stale, refreshed automatically",
                 });
               } catch (error: any) {
-                background_logger.error(
-                  "Opportunistic refresh failed:",
-                  error,
-                );
+                background_logger.error("Opportunistic refresh failed:", error);
                 backgroundState.failedFetches++;
                 sendResponse({
                   success: false,
@@ -497,9 +329,19 @@ chrome.runtime.onMessage.addListener(
       }
 
       // Handle settings update notification
+      // This is fired when the options page saves settings and notifies the
+      // background worker so it can apply them immediately (e.g. log level change).
       if (message.action === "settingsUpdated") {
-        background_logger.info("Settings updated, will apply on next refresh");
         backgroundState.settingsUpdateCount++;
+
+        // Apply any provided log level immediately
+        if (typeof message.logLevel === "string") {
+          const level = message.logLevel as LogLevel;
+          Logger.setGlobalLevel(level);
+          background_logger.info(`Log level updated to: ${level}`);
+        }
+
+        background_logger.info("Settings updated, will apply on next refresh");
         sendResponse({
           success: true,
           message: "Settings will be applied on next refresh",

@@ -4,11 +4,11 @@
  */
 
 import {
-  LOG_LEVELS,
-  LogLevel,
   Config,
-  DEFAULT_CONFIG,
   COLORS,
+  LogLevel,
+  LOG_LEVELS,
+  DEFAULT_CONFIG,
 } from "../config";
 
 /**
@@ -22,14 +22,52 @@ function formatTimestamp(): string {
 /**
  *
  */
+/**
+ * Lightweight logging utility inspired by Python's `logging` module.
+ *
+ * The logger emits messages to the console and optionally broadcasts them via
+ * BroadcastChannel for the Options page log viewer.
+ *
+ * Log level filtering is applied globally, so changing the level affects all
+ * existing Logger instances.
+ */
 export class Logger {
+  /**
+   * Shared configuration used by all Logger instances.
+   * The options can be updated at runtime via `setGlobalConfig`.
+   */
+  static globalConfig: Config = DEFAULT_CONFIG;
+
+  /**
+   * Update global logging configuration (affects all logger instances).
+   */
+  static setGlobalConfig(config: Partial<Config>): void {
+    this.globalConfig = { ...this.globalConfig, ...config };
+  }
+
+  /**
+   * Update global log level (affects all logger instances).
+   *
+   * This is the recommended way to adjust verbosity at runtime.
+   */
+  static setGlobalLevel(level: LogLevel): void {
+    this.setGlobalConfig({ level });
+  }
+
+  /**
+   * Get the current global logging configuration.
+   */
+  static getGlobalConfig(): Config {
+    return this.globalConfig;
+  }
+
   name: string;
-  config: Config;
+  config: Partial<Config>;
   private broadcastChannel: BroadcastChannel | null = null;
 
   constructor(name: string = "Extension", config: Partial<Config> = {}) {
     this.name = name;
-    this.config = { ...DEFAULT_CONFIG, ...config };
+    this.config = config;
     try {
       this.broadcastChannel = new BroadcastChannel("extension_debug_logs");
     } catch (e) {
@@ -58,11 +96,15 @@ export class Logger {
   }
 
   private _log(level: LogLevel, message: string, ...args: any[]): void {
-    if (LOG_LEVELS[level] < LOG_LEVELS[this.config.level]) return;
+    // Merge global config with instance overrides so log level changes propagate
+    // to all existing logger instances.
+    const config: Config = { ...Logger.globalConfig, ...this.config };
+
+    if (LOG_LEVELS[level] < LOG_LEVELS[config.level]) return;
 
     const parts: string[] = [];
 
-    if (this.config.timestamp) {
+    if (config.timestamp) {
       parts.push(`[${formatTimestamp()}]`);
     }
 
@@ -72,7 +114,7 @@ export class Logger {
 
     const output = parts.join(" ");
 
-    if (this.config.useColors) {
+    if (config.useColors) {
       console.log(`%c${output}`, COLORS[level], ...args);
     } else {
       console.log(output, ...args);

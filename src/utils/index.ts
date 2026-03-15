@@ -6,17 +6,8 @@
 import {
   IMAGE_EXPIRY_HOURS,
   PERMANENT_CACHE_EXPIRY_MS,
-  ImageData,
   Settings,
 } from "../config";
-
-/**
- * Formats the current timestamp in ISO 8601 format.
- * @returns {string} The formatted timestamp.
- */
-export function formatTimestamp(): string {
-  return new Date().toISOString();
-}
 
 /**
  * Generate a cryptographically secure random index
@@ -41,28 +32,6 @@ export function getRandomIndex(max: number): number {
   } while (randomValue >= limit);
 
   return randomValue % max;
-}
-
-/**
- * Shuffle an array using Fisher-Yates algorithm with crypto random
- * @param array - Array to shuffle
- * @returns Shuffled array
- */
-export function shuffleArray<T>(array: T[]): T[] {
-  const shuffled = [...array];
-
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = getRandomIndex(i + 1);
-    const temp = shuffled[i];
-    const item = shuffled[j];
-
-    if (temp !== undefined && item !== undefined) {
-      shuffled[i] = item;
-      shuffled[j] = temp;
-    }
-  }
-
-  return shuffled;
 }
 
 /**
@@ -133,52 +102,42 @@ export function formatRelativeTime(timestamp: number): string {
 }
 
 /**
- * Formats duration in milliseconds to human-readable string
- * @param ms - Duration in milliseconds
- * @returns Formatted duration string
+ * Formats a timestamp into a human-readable "time ago" string
  */
-export function formatDuration(ms: number): string {
-  const seconds = Math.floor(ms / 1000);
+export function formatTimeAgo(timestamp: number): string {
+  const now = Date.now();
+  const diff = now - timestamp;
+
+  const seconds = Math.floor(diff / 1000);
   const minutes = Math.floor(seconds / 60);
   const hours = Math.floor(minutes / 60);
   const days = Math.floor(hours / 24);
 
-  if (days > 0) return `${days}d ${hours % 24}h ${minutes % 60}m`;
-  if (hours > 0) return `${hours}h ${minutes % 60}m ${seconds % 60}s`;
-  if (minutes > 0) return `${minutes}m ${seconds % 60}s`;
-  return `${seconds}s`;
+  if (days > 0) return `${days} day${days > 1 ? "s" : ""} ago`;
+  if (hours > 0) return `${hours} hour${hours > 1 ? "s" : ""} ago`;
+  if (minutes > 0) return `${minutes} minute${minutes > 1 ? "s" : ""} ago`;
+  return "Just now";
+}
+
+
+/**
+ * Computes the SHA-256 hash of a Blob (or File).
+ * Uses `crypto.subtle` — available in all modern browsers and extension contexts.
+ * @param blob - The Blob to hash
+ * @returns A promise resolving to the lowercase hexadecimal hash string
+ */
+export async function hashBlob(blob: Blob): Promise<string> {
+  const arrayBuffer = await blob.arrayBuffer();
+  const hashBuffer = await crypto.subtle.digest("SHA-256", arrayBuffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 /**
- * Generates the appropriate source URL for different image sources
- * Handles Unsplash UTM parameters and Pexels photographer pages
- * @param source - The image source type ('unsplash', 'pexels', or 'fallback')
- * @returns The formatted URL for the image source
+ * Computes the SHA-256 hash of a File.
+ * @param file - The file to hash
+ * @returns A promise resolving to the hexadecimal hash string
  */
-export function getSourceUrl(source: ImageData["source"]): string {
-  switch (source) {
-    case "unsplash":
-      return "https://unsplash.com";
-    case "pexels":
-      return "https://pexels.com";
-    default:
-      return "#";
-  }
-}
-
-/**
- * Gets the display name for different image sources
- * Provides user-friendly names for attribution display
- * @param source - The image source type
- * @returns The human-readable source name
- */
-export function getSourceDisplayName(source: ImageData["source"]): string {
-  switch (source) {
-    case "unsplash":
-      return "Unsplash";
-    case "pexels":
-      return "Pexels";
-    default:
-      return "Other";
-  }
+export async function getFileHash(file: File): Promise<string> {
+  return hashBlob(file);
 }

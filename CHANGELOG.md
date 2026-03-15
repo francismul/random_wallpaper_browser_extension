@@ -5,6 +5,24 @@ All notable changes to the Random Wallpaper Extension will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.0.0] - 2026-03-15
+
+### Added
+
+- ✅ **Popup status panel**: added a new popup UI that shows online/offline status, cache stats, and allows refresh without opening a new tab.
+- ✅ **True shuffle cycle**: now a shuffle queue ensures each cached image is shown once per cycle before repeating.
+- ✅ **Recent-history avoidance**: configurable `randomization.recentHistoryLimit` prevents showing previously seen images for N history entries.
+- ✅ **Shuffle unit tests**: added `npm run test:shuffle` to validate both shuffle permutation and repeat-avoidance behavior.
+
+### Improved
+
+- ⚙️ **UI redesign direction**: transition from a “bento-style” settings layout to a more minimal UI using Lucide icons and cleaner controls.
+- 🧠 **Improved random selection logic**: removed time-based “recently viewed” heuristics in favor of deterministic history-based avoidance.
+- 🗄️ **IndexedDB schema bump (v1 → v2)**: added duplicate-detection via content hashing and safely migrated the database version.
+- 🛡️ **IndexedDB robustness**: handle `versionchange`, add write lock timeouts, and prevent deadlocks.
+- 🌐 **Offline detection**: added `checkOnline()` and better offline handling in the popup.
+- 🗒️ **Popup messaging**: added transient in-popup messages for refresh / error feedback.
+
 ## [4.0.0] - 2026-01-28
 
 ### Added

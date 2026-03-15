@@ -1,4 +1,5 @@
 import * as esbuild from "esbuild";
+import path from "path";
 import { cpSync, mkdirSync, existsSync, readFileSync, writeFileSync } from "fs";
 import { glob } from "glob";
 import JavaScriptObfuscator from "javascript-obfuscator";
@@ -76,7 +77,7 @@ const obfuscationConfigs = {
     // Protect critical strings
     reservedStrings: [
       "chrome\\.runtime",
-      "chrome\\.storage", 
+      "chrome\\.storage",
       "chrome\\.alarms",
       "action",
       "https://api",
@@ -134,37 +135,65 @@ const obfuscationConfigs = {
     ],
   },
   fun: {
-    compact: false, // Keep readable for fun
+    compact: false, // keep chaos visible
+
+    // Chaos in execution flow
     controlFlowFlattening: true,
-    controlFlowFlatteningThreshold: 1.0,
+    controlFlowFlatteningThreshold: 1,
+
+    // Inject tons of garbage code
     deadCodeInjection: true,
-    deadCodeInjectionThreshold: 0.8,
-    debugProtection: false,
-    disableConsoleOutput: false,
-    identifierNamesGenerator: "mangled-shuffled",
-    log: false,
+    deadCodeInjectionThreshold: 1,
+
+    // Random numeric expression madness
     numbersToExpressions: true,
-    numbersToExpressionsThreshold: 1.0,
+    numbersToExpressionsThreshold: 1,
+
+    // Identifier insanity
+    identifierNamesGenerator: "mangled-shuffled",
+
     renameGlobals: false,
-    selfDefending: false,
-    simplify: false, // Keep complex for fun
+
+    // Keep structure weird
+    simplify: false,
+
+    // Break every string into confetti
     splitStrings: true,
-    splitStringsChunkLength: 2,
+    splitStringsChunkLength: 1,
+
+    // Hide everything in a string array
     stringArray: true,
-    stringArrayCallsTransform: true,
-    stringArrayCallsTransformThreshold: 1.0,
+    stringArrayThreshold: 1,
+
     stringArrayEncoding: ["base64", "rc4"],
+
     stringArrayIndexShift: true,
     stringArrayRotate: true,
     stringArrayShuffle: true,
-    stringArrayWrappersCount: 10,
+
+    // Wrapper madness
+    stringArrayWrappersCount: 50,
+    stringArrayWrappersType: "function",
     stringArrayWrappersChainedCalls: true,
     stringArrayWrappersParametersCount: 10,
-    stringArrayWrappersType: "function",
-    stringArrayThreshold: 1.0,
+
+    stringArrayCallsTransform: true,
+    stringArrayCallsTransformThreshold: 1,
+
+    // Turn object keys into chaos
     transformObjectKeys: true,
+
+    // Unicode soup
     unicodeEscapeSequence: true,
-    seed: 42, // Reproducible obfuscation
+
+    // Randomization
+    seed: 42,
+
+    // Cosmetic insanity
+    debugProtection: false,
+    disableConsoleOutput: false,
+
+    log: false,
   },
 };
 
@@ -178,7 +207,7 @@ async function obfuscateFiles() {
     const jsFiles = await glob("dist/**/*.js");
 
     console.log(
-      `🔮 Obfuscating ${jsFiles.length} files with "${obfuscationLevel}" level...`
+      `🔮 Obfuscating ${jsFiles.length} files with "${obfuscationLevel}" level...`,
     );
 
     for (const filePath of jsFiles) {
@@ -189,7 +218,7 @@ async function obfuscateFiles() {
     }
 
     console.log(
-      "🎭 Obfuscation complete! Your code is now wonderfully mysterious!"
+      "🎭 Obfuscation complete! Your code is now wonderfully mysterious!",
     );
   } catch (error) {
     console.error("💥 Obfuscation failed:", error);
@@ -199,9 +228,10 @@ async function obfuscateFiles() {
 const buildOptions = {
   entryPoints: {
     background: "src/background.ts",
+    backgroundLogic: "src/backgroundLogic.ts",
     newTab: "src/newTab.ts",
     options: "src/options.ts",
-    
+    popup: "src/popup.ts",
   },
   bundle: true,
   outdir: "dist",
@@ -209,9 +239,49 @@ const buildOptions = {
   platform: "browser",
   target: "es2020",
   sourcemap: false, // No sourcemaps when obfuscating for maximum mystery
-  minify: !isWatch && !shouldObfuscate, // Let obfuscator handle minification
+  minify: false, //!isWatch && !shouldObfuscate, // Let obfuscator handle minification
   splitting: false,
 };
+
+function validateManifestPaths(distDir) {
+  const manifestPath = path.join(distDir, "manifest.json");
+  if (!existsSync(manifestPath)) {
+    throw new Error(`Manifest not found at ${manifestPath}`);
+  }
+
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+  const errors = [];
+
+  const checkPath = (relativePath) => {
+    if (!relativePath) return;
+    const full = path.join(distDir, relativePath);
+    if (!existsSync(full)) {
+      errors.push(relativePath);
+    }
+  };
+
+  // Background worker
+  checkPath(manifest.background?.service_worker);
+
+  // Pages
+  checkPath(manifest.chrome_url_overrides?.newtab);
+  checkPath(manifest.options_page);
+  checkPath(manifest.action?.default_popup);
+
+  // Icons
+  if (manifest.icons) {
+    for (const icon of Object.values(manifest.icons)) {
+      const iconPath = String(icon);
+      checkPath(iconPath);
+    }
+  }
+
+  if (errors.length > 0) {
+    throw new Error(
+      `Manifest references missing output files:\n  ${errors.join("\n  ")}`,
+    );
+  }
+}
 
 async function build() {
   try {
@@ -227,7 +297,7 @@ async function build() {
 
       if (shouldObfuscate) {
         console.log(
-          `🎪 Fun mode activated! Preparing to obfuscate with "${obfuscationLevel}" level...`
+          `🎪 Fun mode activated! Preparing to obfuscate with "${obfuscationLevel}" level...`,
         );
         await obfuscateFiles();
       } else {
@@ -239,6 +309,7 @@ async function build() {
     cpSync("src/manifest.json", "dist/manifest.json");
     cpSync("src/newTab.html", "dist/newTab.html", { force: true });
     cpSync("src/options.html", "dist/options.html", { force: true });
+    cpSync("src/popup.html", "dist/popup.html", { force: true });
 
     // Copy icons if they exist
     if (existsSync("src/icons")) {
@@ -246,9 +317,12 @@ async function build() {
       console.log("📋 Static files and icons copied");
     } else {
       console.log(
-        "📋 Static files copied (⚠️  icons folder not found - extension will need icons to load)"
+        "📋 Static files copied (⚠️  icons folder not found - extension will need icons to load)",
       );
     }
+
+    // Sanity check: ensure dist/manifest.json references existing files
+    validateManifestPaths("dist");
 
     // Add obfuscation summary
     if (shouldObfuscate && !isWatch) {
@@ -258,7 +332,7 @@ async function build() {
       console.log("✨ Your code is now beautifully mysterious!");
       console.log("🕵️ Good luck reverse engineering this masterpiece!");
       console.log(
-        "🎪 Remember: With great obfuscation comes great debugging difficulty!"
+        "🎪 Remember: With great obfuscation comes great debugging difficulty!",
       );
     }
   } catch (error) {

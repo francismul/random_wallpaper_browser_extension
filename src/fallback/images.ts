@@ -1,3 +1,9 @@
+/**
+ * Fallback images for the Random Wallpaper Browser Extension
+ *
+ * This module provides a predefined set of high-quality images to use as fallbacks
+ */
+
 import { ImageData } from "../config";
 
 export const FALLBACK_IMAGES: Omit<

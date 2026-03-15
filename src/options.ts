@@ -4,33 +4,43 @@
  * for the random wallpaper browser extension.
  */
 
-import { testApiKey } from "./api";
+import { testApiKey, checkOnline } from "./api";
 import {
+  Settings,
+  TransitionType,
+  REFRESH_INTERVAL_MS,
+  AVAILABLE_TRANSITIONS,
   DEFAULT_HISTORY_ENABLED,
   DEFAULT_HISTORY_MAX_SIZE,
+  TRANSITION_DISPLAY_NAMES,
   MAX_AUTO_REFRESH_INTERVAL,
   MIN_AUTO_REFRESH_INTERVAL,
-  REFRESH_INTERVAL_MS,
-  Settings,
-  AVAILABLE_TRANSITIONS,
-  TRANSITION_DISPLAY_NAMES,
-  TransitionType,
   DEFAULT_ENABLED_TRANSITIONS,
+  DEFAULT_CONFIG,
+  LogLevel,
 } from "./config";
 import {
-  cleanExpiredImages,
-  clearAllImages,
   clearHistory,
-  getAllValidImages,
-  getDatabaseStats,
+  clearAllImages,
   getHistoryCount,
   getLastFetchTime,
+  getDatabaseStats,
+  getAllValidImages,
+  cleanExpiredImages,
 } from "./db";
 import { Logger } from "./logger";
-import { getSettings, saveSettings } from "./storage";
 import { formatRelativeTime } from "./utils";
+import { getSettings, saveSettings } from "./storage";
+import {
+  maskApiKey,
+  isApiKeyValidFormat,
+  getApiKeyStatus,
+  getApiKeyStatusDisplay,
+  getAllApiKeys,
+} from "./optionsLogic";
 
 const options_logger = new Logger("Options Page");
+
 /**
  * Shows/hides the header loading indicator
  * @param show - Whether to show the loading indicator
@@ -55,7 +65,7 @@ function showMessage(text: string, type: "success" | "error" | "info"): void {
 
   setTimeout(() => {
     messageEl.classList.remove("show");
-  }, 3000);
+  }, 10000);
 }
 
 /**
@@ -95,56 +105,44 @@ function renderApiKeys(settings: Settings): void {
   const container = document.getElementById("apiKeysList")!;
   container.innerHTML = "";
 
-  const unsplashStatusEl = document.getElementById("unsplashStatus")!;
-  const pexelsStatusEl = document.getElementById("pexelsStatus")!;
+  const unsplashStatusEl = document.getElementById("unsplashStatus");
+  const pexelsStatusEl = document.getElementById("pexelsStatus");
 
-  const unsplashCount = settings.apiKeys.unsplash.length;
-  const pexelsCount = settings.apiKeys.pexels.length;
+  const allKeys = getAllApiKeys(settings);
 
-  if (unsplashCount > 0) {
-    const validUnsplash = settings.apiKeys.unsplash.filter((key) => {
-      const keyHash = `unsplash_${key}`;
-      return settings.apiKeyStatus?.[keyHash]?.valid;
+  const unsplashCount = allKeys.filter((k) => k.source === "unsplash").length;
+  const pexelsCount = allKeys.filter((k) => k.source === "pexels").length;
+
+  const getServiceStatus = (source: "unsplash" | "pexels", count: number) => {
+    if (count === 0) {
+      return {
+        text: "Not Configured",
+        color: "#dc3545",
+      };
+    }
+
+    const validCount = allKeys.filter((k) => k.source === source).filter((entry) => {
+      const status = getApiKeyStatus(settings, entry.source, entry.key);
+      return status.valid;
     }).length;
 
-    const statusText =
-      validUnsplash > 0
-        ? `Active (${validUnsplash}/${unsplashCount} valid)`
-        : `Configured (${unsplashCount} key${unsplashCount > 1 ? "s" : ""})`;
-    const statusColor = validUnsplash > 0 ? "#28a745" : "#ffc107";
+    const text =
+      validCount > 0
+        ? `Active (${validCount}/${count} valid)`
+        : `Configured (${count} key${count > 1 ? "s" : ""})`;
+    const color = validCount > 0 ? "#28a745" : "#ffc107";
+    return { text, color };
+  };
 
-    unsplashStatusEl.innerHTML = `📷 Unsplash: <span style="color: ${statusColor}; font-weight: 600;">${statusText}</span>`;
-  } else {
-    unsplashStatusEl.innerHTML = `📷 Unsplash: <span style="color: #dc3545; font-weight: 600;">Not Configured</span>`;
+  if (unsplashStatusEl) {
+    const { text, color } = getServiceStatus("unsplash", unsplashCount);
+    unsplashStatusEl.innerHTML = `📷 Unsplash: <span style="color: ${color}; font-weight: 600;">${text}</span>`;
   }
 
-  if (pexelsCount > 0) {
-    const validPexels = settings.apiKeys.pexels.filter((key) => {
-      const keyHash = `pexels_${key}`;
-      return settings.apiKeyStatus?.[keyHash]?.valid;
-    }).length;
-
-    const statusText =
-      validPexels > 0
-        ? `Active (${validPexels}/${pexelsCount} valid)`
-        : `Configured (${pexelsCount} key${pexelsCount > 1 ? "s" : ""})`;
-    const statusColor = validPexels > 0 ? "#28a745" : "#ffc107";
-
-    pexelsStatusEl.innerHTML = `🖼️ Pexels: <span style="color: ${statusColor}; font-weight: 600;">${statusText}</span>`;
-  } else {
-    pexelsStatusEl.innerHTML = `🖼️ Pexels: <span style="color: #dc3545; font-weight: 600;">Not Configured</span>`;
+  if (pexelsStatusEl) {
+    const { text, color } = getServiceStatus("pexels", pexelsCount);
+    pexelsStatusEl.innerHTML = `🖼️ Pexels: <span style="color: ${color}; font-weight: 600;">${text}</span>`;
   }
-
-  const allKeys = [
-    ...settings.apiKeys.unsplash.map((key) => ({
-      source: "unsplash" as const,
-      key,
-    })),
-    ...settings.apiKeys.pexels.map((key) => ({
-      source: "pexels" as const,
-      key,
-    })),
-  ];
 
   if (allKeys.length === 0) {
     container.innerHTML = `
@@ -165,36 +163,15 @@ function renderApiKeys(settings: Settings): void {
     item.className = "api-key-item";
 
     // Create masked key display (show first 8 and last 4 characters)
-    const maskedKey =
-      key.length > 12
-        ? key.slice(0, 8) +
-          "•".repeat(Math.max(0, key.length - 12)) +
-          key.slice(-4)
-        : key.slice(0, 4) +
-          "•".repeat(Math.max(0, key.length - 8)) +
-          key.slice(-4);
+    const maskedKey = maskApiKey(key);
 
     // Get stored test status with enhanced information
-    const keyHash = `${source}_${key}`;
-    const status = settings.apiKeyStatus?.[keyHash];
-    let statusText = "Not Tested";
-    let statusClass = "unknown";
-    let statusTitle = "Click Test to verify this API key";
-
-    if (status?.tested) {
-      const ageHours = (Date.now() - status.testedAt) / (1000 * 60 * 60);
-      const isStale = ageHours > 24; // Consider status stale after 24 hours
-
-      if (status.valid) {
-        statusText = isStale ? "Valid (Old)" : "Valid";
-        statusClass = isStale ? "valid-stale" : "valid";
-        statusTitle = `Tested ${formatRelativeTime(status.testedAt)}`;
-      } else {
-        statusText = isStale ? "Invalid (Old)" : "Invalid";
-        statusClass = isStale ? "invalid-stale" : "invalid";
-        statusTitle = `Failed test ${formatRelativeTime(status.testedAt)}`;
-      }
-    }
+    const status = getApiKeyStatus(settings, source, key);
+    const {
+      text: statusText,
+      cssClass: statusClass,
+      title: statusTitle,
+    } = getApiKeyStatusDisplay(status);
 
     item.innerHTML = `
       <span class="source">${source.charAt(0).toUpperCase() + source.slice(1)}</span>
@@ -457,12 +434,34 @@ async function loadCacheStats(): Promise<number | null> {
  */
 function renderTransitionsList(settings: Settings): void {
   const container = document.getElementById("transitionsList");
+  const defaultSelect = document.getElementById(
+    "defaultTransition",
+  ) as HTMLSelectElement;
   if (!container) return;
 
   container.innerHTML = "";
 
   const enabledTransitions =
     settings.transition?.enabledTransitions || DEFAULT_ENABLED_TRANSITIONS;
+
+  if (defaultSelect) {
+    defaultSelect.innerHTML = "";
+
+    const randomOption = document.createElement("option");
+    randomOption.value = "random";
+    randomOption.textContent = "Random";
+    defaultSelect.appendChild(randomOption);
+
+    const selected = settings.transition?.defaultTransition || "random";
+
+    AVAILABLE_TRANSITIONS.forEach((transition) => {
+      const option = document.createElement("option");
+      option.value = transition;
+      option.textContent = TRANSITION_DISPLAY_NAMES[transition];
+      if (transition === selected) option.selected = true;
+      defaultSelect.appendChild(option);
+    });
+  }
 
   AVAILABLE_TRANSITIONS.forEach((transition) => {
     const isEnabled = enabledTransitions.includes(transition);
@@ -586,6 +585,33 @@ async function setupEventListeners(): Promise<void> {
     });
   }
 
+  // Recent history limit display update with validation
+  const recentHistoryLimitEl = document.getElementById(
+    "recentHistoryLimit",
+  );
+  if (recentHistoryLimitEl) {
+    recentHistoryLimitEl.addEventListener("input", (e) => {
+      const target = e.target as HTMLInputElement;
+      let value = parseInt(target.value);
+
+      // Enforce reasonable bounds (1-50)
+      if (value < 1) {
+        value = 1;
+        target.value = value.toString();
+      } else if (value > 50) {
+        value = 50;
+        target.value = value.toString();
+      }
+
+      const displayEl = document.getElementById(
+        "recentHistoryLimitDisplay",
+      );
+      if (displayEl) {
+        displayEl.textContent = value.toString();
+      }
+    });
+  }
+
   // Keyword character counters
   const unsplashKeywordsEl = document.getElementById("unsplashKeywords");
   if (unsplashKeywordsEl) {
@@ -632,19 +658,9 @@ async function setupEventListeners(): Promise<void> {
         return;
       }
 
-      if (key.length < 10) {
+      if (!isApiKeyValidFormat(key)) {
         showMessage(
-          "API key appears to be too short. Please check your key.",
-          "error",
-        );
-        keyInputEl.focus();
-        return;
-      }
-
-      // Check for invalid characters
-      if (!/^[a-zA-Z0-9_-]+$/.test(key)) {
-        showMessage(
-          "API key contains invalid characters. Please check your key.",
+          "API key appears invalid. Please ensure it is correct and contains only letters, numbers, underscores or dashes.",
           "error",
         );
         keyInputEl.focus();
@@ -793,6 +809,18 @@ async function setupEventListeners(): Promise<void> {
           interval: autoRefreshInterval,
         };
 
+        // Recent history limit (number of recent images to avoid when choosing new wallpaper)
+        const recentHistoryLimit = parseInt(
+          (
+            document.getElementById("recentHistoryLimit") as HTMLInputElement
+          )?.value || "10",
+        );
+        currentSettings.randomization = {
+          ...(currentSettings.randomization ?? {}),
+          recentHistoryLimit,
+        };
+
+
         // Save clock settings
         currentSettings.clock = {
           enabled:
@@ -875,24 +903,52 @@ async function setupEventListeners(): Promise<void> {
           );
         }
 
+        const defaultTransitionSelect =
+          document.getElementById("defaultTransition") as HTMLSelectElement;
+        const selectedTransition =
+          defaultTransitionSelect?.value === "random"
+            ? undefined
+            : (defaultTransitionSelect?.value as TransitionType | undefined);
+
+        // Ensure the selected default transition is enabled
+        if (
+          selectedTransition &&
+          !enabledTransitions.includes(selectedTransition)
+        ) {
+          enabledTransitions.push(selectedTransition);
+        }
+
         currentSettings.transition = {
           enabledTransitions,
           duration: currentSettings.transition?.duration || 800,
+          ...(selectedTransition ? { defaultTransition: selectedTransition } : {}),
         };
+
+        // Save log level setting and apply immediately
+        const logLevelSelect = document.getElementById(
+          "logLevelSelect",
+        ) as HTMLSelectElement;
+        const selectedLogLevel =
+          (logLevelSelect?.value ?? DEFAULT_CONFIG.level) as LogLevel;
+        currentSettings.logging = { level: selectedLogLevel };
+        Logger.setGlobalLevel(selectedLogLevel);
 
         await saveSettings(currentSettings);
 
         showMessage("Settings saved successfully!", "success");
 
-        // Notify background script to reload settings
-        chrome.runtime.sendMessage({ action: "settingsUpdated" }, () => {
-          if (chrome.runtime.lastError) {
-            options_logger.warn(
-              "Background script notification failed:",
-              chrome.runtime.lastError,
-            );
-          }
-        });
+        // Notify background script to reload settings (including log level)
+        chrome.runtime.sendMessage(
+          { action: "settingsUpdated", logLevel: selectedLogLevel },
+          () => {
+            if (chrome.runtime.lastError) {
+              options_logger.warn(
+                "Background script notification failed:",
+                chrome.runtime.lastError,
+              );
+            }
+          },
+        );
       } catch (error) {
         options_logger.error("Failed to save settings:", error);
         showMessage("Failed to save settings. Please try again.", "error");
@@ -1054,8 +1110,44 @@ async function setupEventListeners(): Promise<void> {
   // Force Refresh Cache button
   const forceRefreshCacheBtn = document.getElementById("forceRefreshCacheBtn");
   if (forceRefreshCacheBtn) {
-    // Check if button is on cooldown
     const currentSettings = await getSettings();
+
+    // Disable force refresh when offline (avoids wasted clicks)
+    const online = await checkOnline();
+    if (!online) {
+      (forceRefreshCacheBtn as HTMLButtonElement).disabled = true;
+      forceRefreshCacheBtn.title = "Offline: connect to the internet to force refresh";
+    }
+
+    // Re-enable/disable force refresh button based on connectivity.
+    const updateForceRefreshState = async () => {
+      const online = await checkOnline();
+      const now = Date.now();
+      const cooldown = currentSettings.forceRefreshCooldown || 0;
+
+      if (!online) {
+        (forceRefreshCacheBtn as HTMLButtonElement).disabled = true;
+        forceRefreshCacheBtn.title =
+          "Offline: connect to the internet to force refresh";
+        return;
+      }
+
+      if (cooldown > now) {
+        (forceRefreshCacheBtn as HTMLButtonElement).disabled = true;
+        forceRefreshCacheBtn.title =
+          "Force refresh is on cooldown. Please wait.";
+        return;
+      }
+
+      (forceRefreshCacheBtn as HTMLButtonElement).disabled = false;
+      forceRefreshCacheBtn.title = "Force Refresh Cache";
+    }; 
+
+    window.addEventListener("online", updateForceRefreshState);
+    window.addEventListener("offline", updateForceRefreshState);
+
+    // Initial state
+    await updateForceRefreshState();
 
     const forceRefreshCooldown = currentSettings.forceRefreshCooldown || 0;
     const now = Date.now();
@@ -1086,6 +1178,16 @@ async function setupEventListeners(): Promise<void> {
 
       const originalText = forceRefreshCacheBtn.textContent;
 
+      // If offline, do not attempt to force refresh
+      const online = await checkOnline();
+      if (!online) {
+        showMessage(
+          "Cannot force refresh while offline. Please connect to the internet.",
+          "error",
+        );
+        return;
+      }
+
       options_logger.debug("Original Text", { originalText });
 
       try {
@@ -1095,7 +1197,7 @@ async function setupEventListeners(): Promise<void> {
 
         // First, check if service worker is responsive
         options_logger.debug("Checking service worker responsiveness...");
-        
+
         // Set a timeout to prevent infinite "Refreshing..." state
         const timeoutId = setTimeout(() => {
           options_logger.error("Force refresh timed out after 30 seconds");
@@ -1267,16 +1369,18 @@ function setupLogViewer(): void {
         <span style="color: #666; font-size: 11px;">[${timeStr}]</span>
         <span style="color: ${color}; font-weight: bold; min-width: 50px; display: inline-block;">[${level}]</span>
         <span style="color: #aaa; font-weight: 600;">[${name}]:</span>
-        <span style="color: ${color}; white-space: pre-wrap;">${textContent}</span>
+        <span style="color: ${color}; white-space: no-wrap;">${textContent}</span>
       `;
 
       // Helper to create line element
       const createLine = (isPopup = false) => {
         const line = document.createElement("div");
         line.style.borderBottom = "1px solid #222";
-        line.style.padding = isPopup ? "1px 2px" : "4px 0";
+        line.style.padding = isPopup ? "1px 2px" : "";
         line.style.fontSize = "12px";
         line.style.lineHeight = "1.4";
+        line.style.display = "flex";
+        line.style.alignItems = "flex-start";
         line.innerHTML = logHtml;
         return line;
       };
@@ -1324,6 +1428,20 @@ async function init(): Promise<void> {
     const settings = await getSettings();
 
     options_logger.debug("settings have been loaded", { settings });
+
+    // Apply and display saved log level setting
+    const logLevel: LogLevel = settings.logging?.level ?? DEFAULT_CONFIG.level;
+    Logger.setGlobalLevel(logLevel);
+    const logLevelSelect = document.getElementById(
+      "logLevelSelect",
+    ) as HTMLSelectElement;
+    if (logLevelSelect) {
+      logLevelSelect.value = logLevel;
+      logLevelSelect.addEventListener("change", () => {
+        const newLevel = logLevelSelect.value as LogLevel;
+        Logger.setGlobalLevel(newLevel);
+      });
+    }
 
     // Render API keys with enhanced status tracking
     renderApiKeys(settings);
@@ -1420,6 +1538,9 @@ async function init(): Promise<void> {
     const historyMaxSizeEl = document.getElementById(
       "historyMaxSize",
     ) as HTMLInputElement;
+    const recentHistoryLimitEl = document.getElementById(
+      "recentHistoryLimit",
+    ) as HTMLInputElement;
 
     if (historyEnabledEl) {
       historyEnabledEl.checked =
@@ -1435,6 +1556,18 @@ async function init(): Promise<void> {
         document.getElementById("historySizeDisplay");
       if (historySizeDisplayEl) {
         historySizeDisplayEl.textContent = validMaxSize.toString();
+      }
+    }
+
+    if (recentHistoryLimitEl) {
+      const recentLimit =
+        settings.randomization?.recentHistoryLimit ?? 10;
+      recentHistoryLimitEl.value = recentLimit.toString();
+
+      const recentHistoryLimitDisplayEl =
+        document.getElementById("recentHistoryLimitDisplay");
+      if (recentHistoryLimitDisplayEl) {
+        recentHistoryLimitDisplayEl.textContent = recentLimit.toString();
       }
     }
 
@@ -1493,7 +1626,7 @@ async function checkAndTriggerRefresh(
     const lastFetch = lastFetchTime ?? (await getLastFetchTime());
     const now = Date.now();
 
-    if (lastFetch && now - lastFetch >= REFRESH_INTERVAL_MS) {
+    if (!lastFetch || now - lastFetch >= REFRESH_INTERVAL_MS) {
       options_logger.debug(
         "⏰ Refresh overdue, notifying background worker...",
       );

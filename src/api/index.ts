@@ -16,11 +16,8 @@ import {
   ImageData,
   Settings,
 } from "../config";
-import { computeExpiry, getRandomIndex } from "../utils";
-import {
-  getLastKeywordIndex,
-  saveLastKeywordIndex,
-} from "../storage";
+import { computeExpiry, getRandomIndex, hashBlob } from "../utils";
+import { getLastKeywordIndex, saveLastKeywordIndex } from "../storage";
 
 const api_logger = new Logger("API");
 
@@ -31,11 +28,12 @@ const api_logger = new Logger("API");
  * @param pexelsKeywords - Pexels keywords (comma-separated)
  * @returns Promise that resolves to the selected keyword or null if no keywords
  */
-async function getNextKeywordSequentially(
+export async function getNextKeywordSequentially(
   unsplashKeywords: string,
   pexelsKeywords: string,
 ): Promise<string | null> {
   // Merge and deduplicate keywords from both sources
+  api_logger.debug("Fetching Keyword from merged Keyword list");
   const allKeywords = [
     ...unsplashKeywords.split(",").map((k) => k.trim()),
     ...pexelsKeywords.split(",").map((k) => k.trim()),
@@ -53,12 +51,14 @@ async function getNextKeywordSequentially(
   const nextIndex = (lastIndex + 1) % allKeywords.length;
 
   // Save the new index for next time
+  api_logger.debug(`Saving new Keword index for next time`);
   await saveLastKeywordIndex(nextIndex);
+  api_logger.debug(`Saved new keyword index for next time: ${nextIndex}`);
 
   const selectedKeyword = allKeywords[nextIndex] || null;
   if (selectedKeyword) {
     api_logger.info(
-      `Selected keyword [${nextIndex + 1}/${allKeywords.length}]: "${selectedKeyword}"`,
+      `Fetched keyword from: [${nextIndex + 1}/${allKeywords.length}]: "${selectedKeyword}"`,
     );
   }
 
@@ -73,12 +73,38 @@ let lastSpeedTest = 0;
 const SPEED_TEST_INTERVAL_MS = 300000; // Test every 5 minutes
 
 /**
+ * Checks whether the host can reach the network.
+ * Unlike `navigator.onLine`, this performs a real request.
+ */
+export async function checkOnline(
+  timeoutMs = 3000,
+  testUrl = "https://www.gstatic.com/generate_204",
+): Promise<boolean> {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    // Use no-cors to avoid failing on opaque responses in extension context.
+    // We treat any successful fetch resolution as online.
+    await fetch(testUrl, {
+      method: "HEAD",
+      cache: "no-store",
+      signal: controller.signal,
+      mode: "no-cors",
+    });
+
+    clearTimeout(timeoutId);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Tests connection speed by downloading a small file
  * @returns Connection speed classification
  */
-async function testConnectionSpeed(): Promise<
-  "slow" | "medium" | "fast"
-> {
+async function testConnectionSpeed(): Promise<"slow" | "medium" | "fast"> {
   try {
     // Use Network Information API if available
     const nav = navigator as any;
@@ -170,6 +196,10 @@ class HttpError extends Error {
   }
 }
 
+export function isRetryableStatus(status: number): boolean {
+  return !NON_RETRYABLE_STATUS_CODES.has(status);
+}
+
 /**
  * Downloads a file from a URL with retry logic and exponential backoff
  * Handles network unavailability gracefully
@@ -179,7 +209,7 @@ class HttpError extends Error {
  * @returns Promise that resolves to a Blob
  * @throws Error if download fails after all retries or encounters non-retryable error
  */
-async function downloadFile(
+export async function downloadFile(
   url: string,
   options: DownloadOptions = {},
 ): Promise<Blob> {
@@ -231,10 +261,7 @@ async function downloadFile(
         errorType: isTimeout ? "timeout" : err.name,
       });
 
-      if (
-        err instanceof HttpError &&
-        NON_RETRYABLE_STATUS_CODES.has(err.status)
-      ) {
+      if (err instanceof HttpError && !isRetryableStatus(err.status)) {
         api_logger.error("Non-retryable download error", {
           url,
           status: err.status,
@@ -283,8 +310,7 @@ async function downloadSingleImage(
   const imageUrl =
     source === "unsplash" ? photo.urls.regular : photo.src.large2x;
   const downloadUrl = source === "unsplash" ? photo.links.download : photo.url;
-  const author =
-    source === "unsplash" ? photo.user.name : photo.photographer;
+  const author = source === "unsplash" ? photo.user.name : photo.photographer;
   const authorUrl =
     source === "unsplash" ? photo.user.links.html : photo.photographer_url;
 
@@ -302,6 +328,8 @@ async function downloadSingleImage(
         maxRetries: 1, // Already handling retries here
       });
 
+      const contentHash = await hashBlob(blob);
+
       api_logger.info(`Successfully downloaded ${source} image`, {
         id: photoId,
       });
@@ -316,6 +344,7 @@ async function downloadSingleImage(
         authorUrl,
         timestamp,
         expiresAt,
+        contentHash,
       };
     } catch (error) {
       lastError = error as Error;
@@ -373,6 +402,9 @@ async function fetchUnsplashImages(
     });
 
     if (!response.ok) {
+      api_logger.error(
+        `Unsplash API Error: ${response.status} ${response.statusText}`,
+      );
       throw new Error(`HTTP ${response.status} ${response.statusText}`);
     }
 
@@ -422,7 +454,7 @@ async function fetchUnsplashImages(
     return successfulImages;
   } catch (error) {
     api_logger.error("Unsplash API metadata fetch failed", { error });
-    return [];
+    throw error;
   }
 }
 
@@ -462,6 +494,7 @@ async function fetchPexelsImages(
     });
 
     if (!response.ok) {
+      api_logger.error(`Error: ${response.status} ${response.statusText}`);
       throw new Error(`HTTP ${response.status} ${response.statusText}`);
     }
 
@@ -508,23 +541,34 @@ async function fetchPexelsImages(
 
     return successfulImages;
   } catch (error) {
-    api_logger.error("Pexels API metadata fetch failed", { error });
-    return [];
+    api_logger.error(`Pexels API metadata fetch failed: ${error}`);
+    throw error;
   }
 }
 
 /**
- * Fetches images from all configured API sources
  * Fetches from all API keys in parallel: 30 images per Unsplash key, 80 per Pexels key
+ * @returns
+ */
+
+/**
+ * Fetches images from all configured API sources
+ *
+ * @param settings
  * @returns Promise that resolves to array of ImageData objects from all sources
+ * @throws
  */
 export async function fetchAllImages(settings: Settings): Promise<ImageData[]> {
   if (!navigator.onLine) {
     api_logger.warn("Network offline, skipping fetch");
-    return [];
+    throw new Error("Network offline");
   }
 
+  api_logger.debug("Fetching Images from All configured API's");
+
   const startTime = Date.now();
+
+  api_logger.debug(`Fetch start time ${startTime}`);
   const unsplashKeyCount = settings.apiKeys.unsplash.length;
   const pexelsKeyCount = settings.apiKeys.pexels.length;
   const expectedUnsplashImages = unsplashKeyCount * UNSPLASH_IMAGES_COUNT;
@@ -545,37 +589,30 @@ export async function fetchAllImages(settings: Settings): Promise<ImageData[]> {
   try {
     const promises: Promise<ImageData[]>[] = [
       ...settings.apiKeys.unsplash.map((key) =>
-        fetchUnsplashImages(
-          key,
-          settings.cache.permanentMode,
-          selectedKeyword,
-        ),
+        fetchUnsplashImages(key, settings.cache.permanentMode, selectedKeyword),
       ),
       ...settings.apiKeys.pexels.map((key) =>
-        fetchPexelsImages(
-          key,
-          settings.cache.permanentMode,
-          selectedKeyword,
-        ),
+        fetchPexelsImages(key, settings.cache.permanentMode, selectedKeyword),
       ),
     ];
 
     if (promises.length === 0) {
       api_logger.warn("No API keys configured");
-      return [];
+      throw new Error("No Api Keys Configured");
     }
 
     const results = await Promise.all(promises);
     const allImages = results.flat();
 
     const duration = Date.now() - startTime;
-    const successRate = expectedTotalImages > 0
-      ? ((allImages.length / expectedTotalImages) * 100).toFixed(1)
-      : "0";
+    const successRate =
+      expectedTotalImages > 0
+        ? ((allImages.length / expectedTotalImages) * 100).toFixed(1)
+        : "0";
 
-    api_logger.info(
-      `Image fetch completed in ${duration}ms - Retrieved: ${allImages.length}/${expectedTotalImages} images (${successRate}% success rate)`,
-    );
+    api_logger.info(`Fetch completed in ${Date.now()} Taking: ${duration}ms`);
+    api_logger.info(`Retrieved: ${allImages.length}/${expectedTotalImages}`);
+    api_logger.info(`Fetch success rate: (${successRate}%)`);
 
     // Warn if success rate is below 80%
     if (allImages.length < expectedTotalImages * 0.8) {
@@ -588,7 +625,7 @@ export async function fetchAllImages(settings: Settings): Promise<ImageData[]> {
     return allImages;
   } catch (error) {
     api_logger.error(`An unexpected error occurred`, { error });
-    return [];
+    throw error;
   }
 }
 
@@ -653,7 +690,7 @@ export async function testApiKey(
 
     return response.ok;
   } catch (error) {
-    api_logger.error(`API key test error for ${source}:`, error);
+    api_logger.error(`API key test error for ${source}: ${error}`);
     return false;
   }
 }

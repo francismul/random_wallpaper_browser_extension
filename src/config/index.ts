@@ -28,7 +28,7 @@ export interface Config {
  * Default configuration
  */
 export const DEFAULT_CONFIG: Config = {
-  level: "INFO",
+  level: "ERROR",
   useColors: true,
   timestamp: true,
 };
@@ -101,7 +101,7 @@ export const DEFAULT_PEXELS_KEYWORDS = "supercars, superbikes";
 
 // DB constants
 export const DB_NAME = "randomWallpaperExtension";
-export const DB_VERSION = 1;
+export const DB_VERSION = 2;
 
 export const IMAGES_STORE_NAME = "imagesStore";
 export const METADATA_STORE_NAME = "metadataStore";
@@ -162,6 +162,11 @@ export interface AppState {
   currentBlobUrl: string | null;
   isLoading: boolean;
   lastLoadTimestamp: number;
+
+  // Shuffle queue used when randomly cycling through images.
+  // Ensures each image is shown once per cycle before repeating.
+  shuffleOrder?: string[];
+  shuffleIndex?: number;
 }
 
 export const DEFAULT_APP_STATE: AppState = {
@@ -175,6 +180,8 @@ export const DEFAULT_APP_STATE: AppState = {
   autoRefreshTimer: null,
   isLoading: false,
   lastLoadTimestamp: 0,
+  shuffleOrder: [],
+  shuffleIndex: 0,
 };
 
 // DB Interfaces
@@ -182,6 +189,8 @@ export interface ImageData {
   id: string;
   url: string;
   blob: Blob;
+  /** SHA-256 hex digest of the blob content — used for deduplication */
+  contentHash?: string;
   source: "unsplash" | "pexels" | "other";
   downloadUrl: string;
   author: string;
@@ -209,9 +218,12 @@ export type TransitionType =
   | "pixelDissolve"
   | "wipe"
   | "ripple"
-  | "noiseReveal"
   | "dissolve"
-  | "pixel";
+  | "pixel"
+  | "zoom"
+  | "curtain"
+  | "filmBurn"
+  | "glitch";
 
 /**
  * All available transition types for user selection
@@ -222,9 +234,12 @@ export const AVAILABLE_TRANSITIONS: TransitionType[] = [
   "pixelDissolve",
   "wipe",
   "ripple",
-  "noiseReveal",
   "dissolve",
   "pixel",
+  "zoom",
+  "curtain",
+  "filmBurn",
+  "glitch",
 ];
 
 /**
@@ -236,9 +251,12 @@ export const TRANSITION_DISPLAY_NAMES: Record<TransitionType, string> = {
   pixelDissolve: "Pixel Dissolve",
   wipe: "Wipe",
   ripple: "Ripple",
-  noiseReveal: "Noise Reveal",
   dissolve: "Dissolve",
   pixel: "Pixelate",
+  zoom: "Zoom",
+  curtain: "Curtain",
+  filmBurn: "Film Burn",
+  glitch: "Glitch",
 };
 
 /**
@@ -312,6 +330,21 @@ export interface Settings {
     /** Whether to keep cached images permanently (never auto-delete) */
     permanentMode: boolean;
   };
+  /** Logging preferences.
+   *
+   * Controls the minimum severity of logs that are emitted and displayed by
+   * the extension's debug console. Setting this to a higher level reduces
+   * output noise in production or when troubleshooting specific issues.
+   */
+  logging?: {
+    /** Minimum log level for recording and displaying logs */
+    level: LogLevel;
+  };
+  /** Randomization and shuffle behavior settings */
+  randomization?: {
+    /** How many recently viewed images should be excluded when picking the next one */
+    recentHistoryLimit?: number;
+  };
 
   /** Transition settings for image changes */
   transition?: {
@@ -319,6 +352,8 @@ export interface Settings {
     enabledTransitions: TransitionType[];
     /** Duration of transition in milliseconds */
     duration: number;
+    /** Preferred transition when cycling wallpapers. Leave empty for random. */
+    defaultTransition?: TransitionType;
   };
 
   /** API key validation status cache */
@@ -371,8 +406,14 @@ export const DEFAULT_SETTINGS: Settings = {
     enabled: DEFAULT_HISTORY_ENABLED,
     maxSize: DEFAULT_HISTORY_MAX_SIZE,
   },
+  randomization: {
+    recentHistoryLimit: 10,
+  },
   cache: {
     permanentMode: false, // Default to false - allow automatic cache cleanup
+  },
+  logging: {
+    level: DEFAULT_CONFIG.level,
   },
   transition: {
     enabledTransitions: DEFAULT_ENABLED_TRANSITIONS,

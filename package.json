@@ -1,6 +1,6 @@
 {
   "name": "random-wallpaper-extension",
-  "version": "4.0.0",
+  "version": "5.0.0",
   "description": "A browser extension that displays random wallpapers from Unsplash and Pexels",
   "type": "module",
   "scripts": {
@@ -11,7 +11,14 @@
     "build:heavy": "node build.js --obfuscate --obfuscate-level=heavy",
     "build:fun": "node build.js --obfuscate --obfuscate-level=fun",
     "watch": "node build.js --watch",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "test": "node scripts/test-refresh.js",
+    "test:options": "node scripts/test-optionsLogic.js",
+    "test:messaging": "node scripts/test-messaging.js",
+    "test:api": "node scripts/test-api.js",
+    "test:check-online": "node scripts/test-checkOnline.js",
+    "test:shuffle": "node scripts/test-shuffle.js",
+    "test:transitions": "node scripts/test-transitions.js"
   },
   "keywords": [
     "wallpaper",
@@ -19,13 +26,16 @@
     "pexels",
     "browser-extension"
   ],
-  "author": "",
-  "license": "ISC",
+  "author": "Francis Mule",
+  "license": "MIT",
   "devDependencies": {
     "@types/chrome": "^0.1.22",
     "esbuild": "^0.25.10",
     "glob": "^11.0.3",
     "javascript-obfuscator": "^4.1.1",
     "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "lucide": "^0.577.0"
   }
 }

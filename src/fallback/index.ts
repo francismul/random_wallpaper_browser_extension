@@ -12,7 +12,7 @@ import {
 import { getSettings } from "../storage";
 import { FALLBACK_IMAGES } from "./images";
 import type { ImageData as DbImageData } from "../config";
-import { clearAllImages } from "../db";
+import { deleteImagesBySource } from "../db";
 import { Logger } from "../logger";
 
 const fallback_logger = new Logger("Fallback");
@@ -22,10 +22,12 @@ const fallback_logger = new Logger("Fallback");
  * Should be called when user configures API keys for the first time
  */
 export async function clearFallbackImages(): Promise<void> {
-  fallback_logger.info("Clearing fallback images from database...");
+  fallback_logger.info('Clearing fallback ("other") images from database...');
   try {
-    await clearAllImages();
-    fallback_logger.info("Fallback images cleared successfully");
+    const deleted = await deleteImagesBySource("other");
+    fallback_logger.info(
+      `Cleared ${deleted} fallback image${deleted === 1 ? "" : "s"}`,
+    );
   } catch (error) {
     fallback_logger.error("Failed to clear fallback images:", error);
     throw error;
@@ -77,7 +79,7 @@ export async function getFallbackImages(): Promise<DbImageData[]> {
           `Failed to fetch fallback image: ${response.status}`,
         );
         fallback_logger.error(`${response.statusText}`);
-        return null;
+        return [];
       }
       const blob = await response.blob();
 
@@ -97,7 +99,7 @@ export async function getFallbackImages(): Promise<DbImageData[]> {
         `Failed to download fallback image ${fallbackImage.id}:`,
         error,
       );
-      return null;
+      return [];
     }
   });
 
